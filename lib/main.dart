@@ -764,7 +764,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
       _tts.setCompletionHandler(() {
         if (mounted) setState(() => _isSpeaking = false);
       });
-      _tts.setCancelHandler((_) {
+      _tts.setCancelHandler(() {
         if (mounted) setState(() => _isSpeaking = false);
       });
       _tts.setErrorHandler((_) {
