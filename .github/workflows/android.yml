@@ -1,4 +1,3 @@
-
 name: Build Android App
 
 on:
@@ -33,6 +32,18 @@ jobs:
         run: |
           flutter create --platforms=android --project-name dyslexia_reading_tutor /tmp/dyslexia_reading_tutor
           cp -R /tmp/dyslexia_reading_tutor/android ./android
+
+      - name: Add microphone permission for speech recognition
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          content = manifest.read_text()
+          permissions = '''\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />\n    <uses-permission android:name="android.permission.INTERNET" />\n'''
+          content = content.replace('<application', permissions + '\n    <queries>\n        <intent>\n            <action android:name="android.speech.RecognitionService" />\n        </intent>\n    </queries>\n\n    <application', 1)
+          manifest.write_text(content)
+          PY
 
       - name: Get dependencies
         run: flutter pub get
