@@ -1,0 +1,47 @@
+
+name: Build Android App
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get app source code
+        uses: actions/checkout@v4
+
+      - name: Install Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Generate Android project files
+        run: |
+          flutter create --platforms=android --project-name dyslexia_reading_tutor /tmp/dyslexia_reading_tutor
+          cp -R /tmp/dyslexia_reading_tutor/android ./android
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Android APK
+        run: flutter build apk --debug
+
+      - name: Save APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: dyslexia-reading-tutor-android
+          path: build/app/outputs/flutter-apk/app-debug.apk
