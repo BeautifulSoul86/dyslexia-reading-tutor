@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:speech_to_text/speech_recognition_result.dart' as stt_result;
+import 'package:flutter_tts/flutter_tts.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -205,12 +206,162 @@ class _LessonScreenState extends State<LessonScreen> {
   int supportedAttempts = 0;
   int wordsPracticed = 0;
   bool showSoundBreakdown = false;
+  final stt.SpeechToText _lessonSpeech = stt.SpeechToText();
+  final FlutterTts _lessonTts = FlutterTts();
+  bool _speechAvailable = false;
+  bool _lessonVoiceReady = false;
+  bool _isListening = false;
+  bool _showEmergencyTyping = false;
+  String _recognizedWords = '';
+  String _speechProblem = '';
+  final TextEditingController _emergencyController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadProgress();
+    _configureLessonVoice();
     _newWord(first: true);
+  }
+
+  Future<void> _configureLessonVoice() async {
+    try {
+      await _lessonTts.setLanguage('en-US');
+      await _lessonTts.setSpeechRate(widget.learnerType == 'Child' ? 0.43 : 0.48);
+      await _lessonTts.setPitch(widget.learnerType == 'Child' ? 1.12 : 1.0);
+      await _lessonTts.awaitSpeakCompletion(true);
+      _lessonVoiceReady = true;
+      final available = await _lessonSpeech.initialize(
+        onStatus: (status) {
+          if (!mounted) return;
+          if (status == 'notListening' || status == 'done') {
+            setState(() => _isListening = false);
+          }
+        },
+        onError: (error) {
+          if (!mounted) return;
+          setState(() {
+            _isListening = false;
+            _speechProblem = error.errorMsg;
+            _showEmergencyTyping = true;
+          });
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _speechAvailable = available;
+        if (!available) {
+          _speechProblem = 'Speech recognition is not available on this device.';
+          _showEmergencyTyping = true;
+        }
+      });
+      if (tutorMessage.isNotEmpty) _speakLessonMessage(tutorMessage);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _speechProblem = 'The microphone or speech service could not start.';
+        _showEmergencyTyping = true;
+      });
+    }
+  }
+
+  Future<void> _speakLessonMessage(String message) async {
+    if (message.trim().isEmpty || !_lessonVoiceReady) return;
+    try {
+      if (_isListening) await _lessonSpeech.stop();
+      await _lessonTts.stop();
+      await _lessonTts.speak(message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _speechProblem = 'Tutor audio is unavailable right now.';
+      });
+    }
+  }
+
+  Future<void> _toggleLessonMicrophone() async {
+    if (_isListening) {
+      await _lessonSpeech.stop();
+      if (!mounted) return;
+      setState(() => _isListening = false);
+      _evaluateSpokenAttempt();
+      return;
+    }
+    if (!_speechAvailable) {
+      setState(() {
+        _showEmergencyTyping = true;
+        _speechProblem = 'The microphone is not available. You can type only as a temporary backup.';
+      });
+      return;
+    }
+    await _lessonTts.stop();
+    setState(() {
+      _recognizedWords = '';
+      _speechProblem = '';
+      _showEmergencyTyping = false;
+      _isListening = true;
+    });
+    try {
+      await _lessonSpeech.listen(
+        onResult: _onLessonSpeechResult,
+        listenFor: const Duration(seconds: 45),
+        pauseFor: const Duration(seconds: 5),
+        partialResults: true,
+        cancelOnError: false,
+        listenMode: stt.ListenMode.dictation,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isListening = false;
+        _showEmergencyTyping = true;
+        _speechProblem = 'The microphone could not start. Please use the temporary text backup.';
+      });
+    }
+  }
+
+  void _onLessonSpeechResult(stt_result.SpeechRecognitionResult result) {
+    if (!mounted) return;
+    setState(() => _recognizedWords = result.recognizedWords);
+  }
+
+  void _evaluateSpokenAttempt() {
+    final heard = _recognizedWords.trim();
+    if (heard.isEmpty) {
+      setState(() {
+        _speechProblem = 'I did not catch that. Tap the microphone and try again.';
+        _showEmergencyTyping = false;
+        tutorMessage = widget.learnerType == 'Child'
+            ? 'I didn’t quite catch your voice. Let’s try that word again!'
+            : 'I did not catch that attempt. Please try the word again.';
+      });
+      _speakLessonMessage(tutorMessage);
+      return;
+    }
+    final cleaned = heard.toLowerCase().replaceAll(RegExp(r'[^a-z\s]'), ' ').trim();
+    final target = current?.word.toLowerCase() ?? '';
+    final heardTarget = cleaned.split(RegExp(r'\s+')).contains(target);
+    setState(() {
+      status = 'spoken_attempt';
+      wordsPracticed++;
+      tutorMessage = heardTarget
+          ? (widget.learnerType == 'Child'
+              ? 'I heard you say $target! Nice speaking practice. Now let’s look at how those sounds fit together.'
+              : 'I heard the target word in your response. Good practice. Let’s review how its sounds connect.')
+          : (widget.learnerType == 'Child'
+              ? 'I heard “$heard.” That’s okay! Let’s slow down and work through $target together.'
+              : 'I heard “$heard.” Let’s slow down and work through the target word, $target.');
+    });
+    _saveProgress();
+    _speakLessonMessage(tutorMessage);
+  }
+
+  void _submitEmergencyText() {
+    final text = _emergencyController.text.trim();
+    if (text.isEmpty) return;
+    setState(() => _recognizedWords = text);
+    _emergencyController.clear();
+    _evaluateSpokenAttempt();
   }
 
   Future<void> _loadProgress() async {
@@ -241,12 +392,15 @@ class _LessonScreenState extends State<LessonScreen> {
       current = next;
       status = 'start';
       showSoundBreakdown = false;
+      _recognizedWords = '';
+      _showEmergencyTyping = false;
       tutorMessage = first
           ? (widget.learnerType == 'Child'
               ? 'Hey, superstar! 🌟 Let’s wake up those reading muscles. What sound does the first letter make?'
               : 'Welcome. Let’s work through a word carefully. What sound does the first letter make?')
           : 'Here is a fresh word. Take your time and look carefully at every letter. What sound do you hear at the beginning?';
     });
+    _speakLessonMessage(tutorMessage);
   }
 
   void _needHelp() {
@@ -259,19 +413,16 @@ class _LessonScreenState extends State<LessonScreen> {
           : 'That is okay. Let’s slow down and work through the sounds one at a time.';
     });
     _saveProgress();
+    _speakLessonMessage(tutorMessage);
   }
 
-  void _independentAttempt() {
-    setState(() {
-      status = 'self_reported';
-      independentReads++;
-      stars++;
-      wordsPracticed++;
-      tutorMessage = widget.learnerType == 'Child'
-          ? 'You gave it a try! ⭐ In this preview, I can’t hear or verify your reading yet, but your practice effort counts.'
-          : 'Thanks for recording your attempt. This preview does not verify spoken reading yet, so this is a self-reported practice record.';
-    });
-    _saveProgress();
+
+  @override
+  void dispose() {
+    _lessonSpeech.stop();
+    _lessonTts.stop();
+    _emergencyController.dispose();
+    super.dispose();
   }
 
   Color _letterColor(String letter) =>
@@ -388,6 +539,12 @@ class _LessonScreenState extends State<LessonScreen> {
                   const SizedBox(height: 10),
                   const Text('Red = consonants     Blue = vowels',
                       style: TextStyle(fontSize: 12, color: Color(0xFF667085))),
+                  const SizedBox(height: 10),
+                  TextButton.icon(
+                    onPressed: _lessonVoiceReady ? () => _speakLessonMessage(word.word) : null,
+                    icon: const Icon(Icons.volume_up_rounded),
+                    label: const Text('Hear this word'),
+                  ),
                   if (showSoundBreakdown) ...[
                     const SizedBox(height: 20),
                     Container(
@@ -418,32 +575,91 @@ class _LessonScreenState extends State<LessonScreen> {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: ink)),
             const SizedBox(height: 6),
             const Text(
-              'In this preview, choose how the practice went. These buttons do not listen to or verify speech yet.',
+              'Say the word out loud. Your tutor will listen and talk you through the next step.',
               style: TextStyle(color: Color(0xFF667085), height: 1.4),
             ),
             const SizedBox(height: 14),
             FilledButton.icon(
               style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(54),
-                backgroundColor: mint,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                minimumSize: const Size.fromHeight(62),
+                backgroundColor: _isListening ? coral : mint,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              onPressed: status == 'self_reported' ? null : _independentAttempt,
-              icon: const Icon(Icons.check_circle_outline),
-              label: const Text('I decoded it independently'),
+              onPressed: _toggleLessonMicrophone,
+              icon: Icon(_isListening ? Icons.stop_circle_outlined : Icons.mic),
+              label: Text(_isListening ? 'Stop listening and send' : 'Tap to speak'),
             ),
+            if (_isListening) ...[
+              const SizedBox(height: 10),
+              const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.graphic_eq, color: mint),
+                SizedBox(width: 8),
+                Text('Listening... speak clearly, then tap Stop',
+                    style: TextStyle(color: mint, fontWeight: FontWeight.w700)),
+              ]),
+            ],
+            if (_recognizedWords.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(13),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3F6FC),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('I heard:', style: TextStyle(fontWeight: FontWeight.bold, color: ink)),
+                  const SizedBox(height: 5),
+                  Text(_recognizedWords, style: const TextStyle(fontSize: 17, color: ink)),
+                ]),
+              ),
+            ],
+            if (_speechProblem.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(_speechProblem,
+                  style: const TextStyle(color: Color(0xFF9A5B12), fontSize: 13)),
+            ],
+            if (_showEmergencyTyping) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _emergencyController,
+                decoration: InputDecoration(
+                  labelText: 'Temporary response if the microphone fails',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  suffixIcon: IconButton(
+                    tooltip: 'Send temporary response',
+                    icon: const Icon(Icons.send),
+                    onPressed: _submitEmergencyText,
+                  ),
+                ),
+                onSubmitted: (_) => _submitEmergencyText(),
+              ),
+              TextButton.icon(
+                onPressed: () async {
+                  final available = await _lessonSpeech.initialize();
+                  if (!mounted) return;
+                  setState(() {
+                    _speechAvailable = available;
+                    _showEmergencyTyping = !available;
+                    _speechProblem = available ? '' : 'Microphone is still unavailable.';
+                  });
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Try microphone again'),
+              ),
+            ],
             const SizedBox(height: 10),
             OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(54),
+                minimumSize: const Size.fromHeight(50),
                 foregroundColor: ink,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               ),
               onPressed: _needHelp,
               icon: const Icon(Icons.lightbulb_outline),
-              label: const Text('I need help with this word'),
+              label: const Text('Help me sound it out'),
             ),
-            if (status == 'help' || status == 'self_reported') ...[
+            if (status == 'help' || status == 'spoken_attempt') ...[
               const SizedBox(height: 10),
               FilledButton.icon(
                 style: FilledButton.styleFrom(
@@ -452,10 +668,6 @@ class _LessonScreenState extends State<LessonScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 ),
                 onPressed: () {
-                  setState(() {
-                    wordsPracticed++;
-                  });
-                  _saveProgress();
                   _newWord();
                 },
                 icon: const Icon(Icons.shuffle_rounded),
@@ -477,7 +689,7 @@ class _LessonScreenState extends State<LessonScreen> {
                     _StatLine(label: 'Stars earned', value: '$stars'),
                     const SizedBox(height: 8),
                     const Text(
-                      'Important: independent reading mastery will only be awarded after real speech assessment is connected. Self-reported attempts are kept separate.',
+                      'Speech recognition shows what the device heard. It does not yet measure individual phonemes or prove reading mastery.',
                       style: TextStyle(fontSize: 12, color: Color(0xFF667085), height: 1.4),
                     ),
                   ],
@@ -509,11 +721,14 @@ class TutorChatScreen extends StatefulWidget {
 
 class _TutorChatScreenState extends State<TutorChatScreen> {
   final stt.SpeechToText _speech = stt.SpeechToText();
+  final FlutterTts _tts = FlutterTts();
   final TextEditingController _fallbackController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<Map<String, String>> _messages = [];
 
   bool _speechReady = false;
+  bool _ttsReady = false;
+  bool _isSpeaking = false;
   bool _showTypingFallback = false;
   bool _handledThisSession = false;
   bool _initializing = true;
@@ -533,6 +748,46 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
           : "Hello! I'm your reading partner. Tap the microphone to speak whenever you're ready.",
     });
     _initializeSpeech();
+    _initializeTts();
+  }
+
+  Future<void> _initializeTts() async {
+    try {
+      await _tts.setLanguage('en-US');
+      await _tts.setSpeechRate(0.46);
+      await _tts.setVolume(1.0);
+      await _tts.setPitch(_isChild ? 1.12 : 1.0);
+      await _tts.awaitSpeakCompletion(true);
+      _tts.setStartHandler(() {
+        if (mounted) setState(() => _isSpeaking = true);
+      });
+      _tts.setCompletionHandler(() {
+        if (mounted) setState(() => _isSpeaking = false);
+      });
+      _tts.setCancelHandler((_) {
+        if (mounted) setState(() => _isSpeaking = false);
+      });
+      _tts.setErrorHandler((_) {
+        if (mounted) setState(() => _isSpeaking = false);
+      });
+      if (mounted) setState(() => _ttsReady = true);
+      // Speak the welcome message once the voice engine is initialized.
+      if (_messages.isNotEmpty) {
+        await _speakTutorText(_messages.first['text'] ?? '');
+      }
+    } catch (_) {
+      if (mounted) setState(() => _ttsReady = false);
+    }
+  }
+
+  Future<void> _speakTutorText(String text) async {
+    if (!_ttsReady || text.trim().isEmpty) return;
+    try {
+      await _tts.stop();
+      await _tts.speak(text);
+    } catch (_) {
+      if (mounted) setState(() => _isSpeaking = false);
+    }
   }
 
   Future<void> _initializeSpeech() async {
@@ -602,6 +857,9 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
       if (!_speechReady) return;
     }
 
+    await _tts.stop();
+    if (mounted) setState(() => _isSpeaking = false);
+
     setState(() {
       _recognizedWords = '';
       _handledThisSession = false;
@@ -648,10 +906,12 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   }
 
   void _addConversationTurn(String message) {
+    final tutorReply = _makeTutorReply(message);
     setState(() {
       _messages.add({'speaker': 'learner', 'text': message});
-      _messages.add({'speaker': 'tutor', 'text': _makeTutorReply(message)});
+      _messages.add({'speaker': 'tutor', 'text': tutorReply});
     });
+    _speakTutorText(tutorReply);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -718,8 +978,24 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
                     color: Color(0xFF778195))),
             const SizedBox(height: 5),
-            Text(message['text'] ?? '',
-                style: const TextStyle(fontSize: 15, color: ink, height: 1.4)),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(message['text'] ?? '',
+                      style: const TextStyle(fontSize: 15, color: ink, height: 1.4)),
+                ),
+                if (isTutor)
+                  IconButton(
+                    tooltip: 'Hear this message again',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: _ttsReady
+                        ? () => _speakTutorText(message['text'] ?? '')
+                        : null,
+                    icon: const Icon(Icons.volume_up_rounded, size: 20),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
@@ -729,6 +1005,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   @override
   void dispose() {
     _speech.stop();
+    _tts.stop();
     _fallbackController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -792,7 +1069,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 8, 18, 6),
-              child: Text(_statusMessage,
+              child: Text(_isSpeaking ? 'Your tutor is speaking... Tap the microphone to interrupt.' : _statusMessage,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: listening ? mint : const Color(0xFF667085),
