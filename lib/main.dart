@@ -308,7 +308,7 @@ class _LessonScreenState extends State<LessonScreen> {
         pauseFor: const Duration(seconds: 5),
         partialResults: true,
         cancelOnError: false,
-        listenMode: stt.ListenMode.dictation,
+        localeId: 'en_US',
       );
     } catch (_) {
       if (!mounted) return;
