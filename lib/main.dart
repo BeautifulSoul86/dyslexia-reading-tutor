@@ -1489,7 +1489,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
       );
     }
 
-    if (RegExp(r'\b(help|hard|difficult|stuck|cannot|can\'t)\b')
+    if (RegExp(r"\b(help|hard|difficult|stuck|cannot|can't)\b")
         .hasMatch(text)) {
       return _pickReply(
         isChild
