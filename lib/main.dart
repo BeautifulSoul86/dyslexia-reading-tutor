@@ -17,6 +17,7 @@ const Color coral = Color(0xFFE05252);
 const Color blue = Color(0xFF3478D4);
 const Color mint = Color(0xFF2F9B78);
 const Color cream = Color(0xFFFFFBF4);
+const Color gold = Color(0xFFE0A526);
 
 class DyslexiaTutorApp extends StatelessWidget {
   const DyslexiaTutorApp({super.key});
@@ -29,12 +30,16 @@ class DyslexiaTutorApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         scaffoldBackgroundColor: cream,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF5476B8),
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: blue),
         textTheme: const TextTheme(
-          headlineMedium: TextStyle(color: ink, fontWeight: FontWeight.w800),
-          titleLarge: TextStyle(color: ink, fontWeight: FontWeight.w700),
+          headlineMedium: TextStyle(
+            color: ink,
+            fontWeight: FontWeight.w800,
+          ),
+          titleLarge: TextStyle(
+            color: ink,
+            fontWeight: FontWeight.w700,
+          ),
           bodyLarge: TextStyle(color: ink, height: 1.4),
         ),
         cardTheme: CardThemeData(
@@ -78,7 +83,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 color: const Color(0xFFE9EFFB),
                 borderRadius: BorderRadius.circular(26),
               ),
-              child: const Icon(Icons.menu_book_rounded, size: 48, color: blue),
+              child: const Icon(
+                Icons.menu_book_rounded,
+                size: 48,
+                color: blue,
+              ),
             ),
             const SizedBox(height: 22),
             const Text(
@@ -115,8 +124,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ),
               ],
               selected: {learnerType},
-              onSelectionChanged: (v) {
-                setState(() => learnerType = v.first);
+              onSelectionChanged: (values) {
+                setState(() => learnerType = values.first);
               },
             ),
             const SizedBox(height: 22),
@@ -171,8 +180,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   child: Text('Mature and conversational'),
                 ),
               ],
-              onChanged: (v) {
-                setState(() => tutorVoice = v ?? tutorVoice);
+              onChanged: (value) {
+                setState(() => tutorVoice = value ?? tutorVoice);
               },
             ),
             const SizedBox(height: 26),
@@ -199,14 +208,20 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               icon: const Icon(Icons.play_arrow_rounded),
               label: const Text(
                 'Meet my reading tutor',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(height: 14),
             const Text(
-              'Preview build: reading practice is interactive. Speech input and tutor audio are available. Live AI conversation and speech-based reading assessment are not connected yet.',
+              'Practice with voice guidance, interactive sound lessons, and rewards. Live AI conversation and phoneme-level speech assessment are not connected yet.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Color(0xFF7A8494)),
+              style: TextStyle(
+                fontSize: 12,
+                color: Color(0xFF7A8494),
+              ),
             ),
           ],
         ),
@@ -260,30 +275,40 @@ class _LessonScreenState extends State<LessonScreen> {
 
   String tutorMessage = '';
   String status = 'start';
+  String recognizedWords = '';
+  String speechProblem = '';
+  String rewardMessage = '';
 
   int stars = 0;
   int independentReads = 0;
   int supportedAttempts = 0;
   int wordsPracticed = 0;
+  int currentStreak = 0;
+
+  int guidedStep = 0;
 
   bool showSoundBreakdown = false;
+  bool speechAvailable = false;
+  bool lessonVoiceReady = false;
+  bool isListening = false;
+  bool lessonSessionHandled = true;
+  bool showEmergencyTyping = false;
+  bool wordRewarded = false;
+  bool guidedMode = false;
+  bool awaitingIndependentConfirmation = false;
+  bool showCelebration = false;
 
-  final stt.SpeechToText _lessonSpeech = stt.SpeechToText();
-  final FlutterTts _lessonTts = FlutterTts();
+  Timer? lessonEvaluationTimer;
 
-  bool _speechAvailable = false;
-  bool _lessonVoiceReady = false;
-  bool _isListening = false;
-  bool _lessonSessionHandled = true;
-  bool _showEmergencyTyping = false;
+  final stt.SpeechToText lessonSpeech = stt.SpeechToText();
+  final FlutterTts lessonTts = FlutterTts();
 
-  Timer? _lessonEvaluationTimer;
-
-  String _recognizedWords = '';
-  String _speechProblem = '';
-
-  final TextEditingController _emergencyController =
+  final TextEditingController emergencyController =
       TextEditingController();
+
+  bool get isChild => widget.learnerType == 'Child';
+
+  List<String> get sounds => (current?.word ?? '').split('');
 
   @override
   void initState() {
@@ -291,367 +316,6 @@ class _LessonScreenState extends State<LessonScreen> {
     _loadProgress();
     _configureLessonVoice();
     _newWord(first: true);
-  }
-
-  Future<void> _configureLessonVoice() async {
-    try {
-      await _lessonTts.setLanguage('en-US');
-      await _lessonTts.setSpeechRate(
-        widget.learnerType == 'Child' ? 0.43 : 0.48,
-      );
-      await _lessonTts.setVolume(1.0);
-      await _lessonTts.setPitch(
-        widget.learnerType == 'Child' ? 1.12 : 1.0,
-      );
-      await _lessonTts.awaitSpeakCompletion(true);
-
-      if (!mounted) return;
-      setState(() => _lessonVoiceReady = true);
-
-      final available = await _lessonSpeech.initialize(
-        onStatus: (speechStatus) {
-          if (!mounted) return;
-
-          if (speechStatus == 'notListening' ||
-              speechStatus == 'done') {
-            setState(() => _isListening = false);
-
-            if (!_lessonSessionHandled &&
-                _recognizedWords.trim().isNotEmpty) {
-              _scheduleLessonEvaluation();
-            }
-          }
-        },
-        onError: (error) {
-          if (!mounted) return;
-
-          final hasWords = _recognizedWords.trim().isNotEmpty;
-
-          setState(() {
-            _isListening = false;
-            _speechProblem = hasWords
-                ? ''
-                : 'The microphone stopped before I could hear enough. Please try again.';
-            _showEmergencyTyping = false;
-          });
-
-          if (!_lessonSessionHandled && hasWords) {
-            _scheduleLessonEvaluation();
-          }
-        },
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _speechAvailable = available;
-
-        if (!available) {
-          _speechProblem =
-              'Speech recognition is not available on this device.';
-          _showEmergencyTyping = true;
-        }
-      });
-
-      if (tutorMessage.isNotEmpty) {
-        _speakLessonMessage(tutorMessage);
-      }
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _speechProblem =
-            'The microphone or speech service could not start.';
-        _showEmergencyTyping = true;
-      });
-    }
-  }
-
-  Future<void> _speakLessonMessage(String message) async {
-    if (message.trim().isEmpty || !_lessonVoiceReady) return;
-
-    try {
-      if (_isListening) {
-        await _lessonSpeech.stop();
-      }
-
-      await _lessonTts.stop();
-      await _lessonTts.speak(message);
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _speechProblem = 'Tutor audio is unavailable right now.';
-      });
-    }
-  }
-
-  Future<void> _toggleLessonMicrophone() async {
-    if (_isListening) {
-      await _lessonSpeech.stop();
-
-      if (!mounted) return;
-
-      setState(() => _isListening = false);
-      _scheduleLessonEvaluation();
-      return;
-    }
-
-    if (!_speechAvailable) {
-      setState(() {
-        _showEmergencyTyping = true;
-        _speechProblem =
-            'The microphone is not available. You can use the temporary text backup.';
-      });
-      return;
-    }
-
-    await _lessonTts.stop();
-
-    if (!mounted) return;
-
-    setState(() {
-      _recognizedWords = '';
-      _speechProblem = '';
-      _showEmergencyTyping = false;
-      _lessonSessionHandled = false;
-      _isListening = true;
-    });
-
-    try {
-      await _lessonSpeech.listen(
-        onResult: _onLessonSpeechResult,
-        listenFor: const Duration(seconds: 90),
-        pauseFor: const Duration(seconds: 15),
-        partialResults: true,
-        cancelOnError: false,
-        localeId: 'en_US',
-      );
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _isListening = false;
-        _showEmergencyTyping = true;
-        _speechProblem =
-            'The microphone could not start. Please use the temporary text backup.';
-      });
-    }
-  }
-
-  void _onLessonSpeechResult(stt_result.SpeechRecognitionResult result) {
-    if (!mounted || _lessonSessionHandled) return;
-
-    setState(() {
-      _recognizedWords = result.recognizedWords;
-    });
-
-    if (result.finalResult) {
-      _scheduleLessonEvaluation();
-    }
-  }
-
-  void _scheduleLessonEvaluation() {
-    if (_lessonSessionHandled) return;
-
-    _lessonEvaluationTimer?.cancel();
-
-    _lessonEvaluationTimer = Timer(
-      const Duration(milliseconds: 1400),
-      () {
-        if (!mounted || _lessonSessionHandled) return;
-
-        _lessonSessionHandled = true;
-        _evaluateSpokenAttempt();
-      },
-    );
-  }
-
-  void _evaluateSpokenAttempt() {
-    final heard = _recognizedWords.trim();
-
-    if (heard.isEmpty) {
-      setState(() {
-        _speechProblem =
-            'I did not catch that. Tap the microphone and try again.';
-        _showEmergencyTyping = false;
-
-        tutorMessage = widget.learnerType == 'Child'
-            ? 'I didn’t quite catch your voice. Let’s try that word again!'
-            : 'I did not catch that attempt. Please try the word again.';
-      });
-
-      _speakLessonMessage(tutorMessage);
-      return;
-    }
-
-    final cleaned = heard
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z\s]'), ' ')
-        .trim();
-
-    final target = current?.word.toLowerCase() ?? '';
-    final heardTarget =
-        cleaned.split(RegExp(r'\s+')).contains(target);
-
-    setState(() {
-      status = 'spoken_attempt';
-      wordsPracticed++;
-
-      tutorMessage = heardTarget
-          ? (widget.learnerType == 'Child'
-              ? 'I heard you say $target! Nice speaking practice. Now let’s look at how those sounds fit together.'
-              : 'I heard the target word in your response. Good practice. Let’s review how its sounds connect.')
-          : (widget.learnerType == 'Child'
-              ? 'I heard “$heard.” That’s okay! Let’s slow down and work through $target together.'
-              : 'I heard “$heard.” Let’s slow down and work through the target word, $target.');
-    });
-
-    _saveProgress();
-    _speakLessonMessage(tutorMessage);
-  }
-
-  void _submitEmergencyText() {
-    final text = _emergencyController.text.trim();
-    if (text.isEmpty) return;
-
-    _lessonEvaluationTimer?.cancel();
-    _lessonSessionHandled = true;
-
-    setState(() {
-      _recognizedWords = text;
-    });
-
-    _emergencyController.clear();
-    _evaluateSpokenAttempt();
-  }
-
-  Future<void> _loadProgress() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
-
-    setState(() {
-      stars = prefs.getInt('stars') ?? 0;
-      independentReads = prefs.getInt('independentReads') ?? 0;
-      supportedAttempts = prefs.getInt('supportedAttempts') ?? 0;
-      wordsPracticed = prefs.getInt('wordsPracticed') ?? 0;
-    });
-  }
-
-  Future<void> _saveProgress() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    await prefs.setInt('stars', stars);
-    await prefs.setInt('independentReads', independentReads);
-    await prefs.setInt('supportedAttempts', supportedAttempts);
-    await prefs.setInt('wordsPracticed', wordsPracticed);
-  }
-
-  void _newWord({bool first = false}) {
-    if (queue.isEmpty) {
-      queue = List<LessonWord>.from(wordBank)..shuffle(random);
-    }
-
-    final next = queue.removeAt(0);
-
-    _lessonEvaluationTimer?.cancel();
-    _lessonSessionHandled = true;
-
-    setState(() {
-      current = next;
-      status = 'start';
-      showSoundBreakdown = false;
-      _recognizedWords = '';
-      _speechProblem = '';
-      _showEmergencyTyping = false;
-
-      tutorMessage = first
-          ? (widget.learnerType == 'Child'
-              ? 'Hey, superstar! 🌟 Let’s wake up those reading muscles. Read this word aloud when you’re ready!'
-              : 'Welcome. Let’s work through a word carefully. Please read the word aloud when you are ready.')
-          : 'Here is a fresh word. Take your time, look carefully at every letter, and read the whole word aloud when you are ready.';
-    });
-
-    _speakLessonMessage(tutorMessage);
-  }
-
-  void _needHelp() {
-    _lessonEvaluationTimer?.cancel();
-    _lessonSessionHandled = true;
-
-    setState(() {
-      status = 'help';
-      showSoundBreakdown = true;
-      supportedAttempts++;
-
-      tutorMessage = widget.learnerType == 'Child'
-          ? 'No worries, word detective! 🔎 We can crack this word together. Let’s slow down and look at each sound.'
-          : 'That is okay. Let’s slow down and work through the sounds one at a time.';
-    });
-
-    _saveProgress();
-    _speakLessonMessage(tutorMessage);
-  }
-
-  Future<void> _retryMicrophone() async {
-    try {
-      await _lessonSpeech.stop();
-
-      final available = await _lessonSpeech.initialize(
-        onStatus: (speechStatus) {
-          if (!mounted) return;
-
-          if (speechStatus == 'notListening' ||
-              speechStatus == 'done') {
-            setState(() => _isListening = false);
-
-            if (!_lessonSessionHandled &&
-                _recognizedWords.trim().isNotEmpty) {
-              _scheduleLessonEvaluation();
-            }
-          }
-        },
-        onError: (error) {
-          if (!mounted) return;
-
-          setState(() {
-            _isListening = false;
-            _speechProblem = error.errorMsg;
-          });
-        },
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _speechAvailable = available;
-        _showEmergencyTyping = !available;
-        _speechProblem = available
-            ? ''
-            : 'Microphone is still unavailable.';
-      });
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _speechAvailable = false;
-        _showEmergencyTyping = true;
-        _speechProblem = 'The microphone could not be restarted.';
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _lessonEvaluationTimer?.cancel();
-    _lessonSpeech.stop();
-    _lessonTts.stop();
-    _emergencyController.dispose();
-    super.dispose();
-  }
-
-  Color _letterColor(String letter) {
-    return 'aeiou'.contains(letter.toLowerCase()) ? blue : coral;
   }
     @override
   Widget build(BuildContext context) {
