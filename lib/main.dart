@@ -287,8 +287,342 @@ class _LessonScreenState extends State<LessonScreen> {
         backgroundColor: cream,
         title: const Text('Reading practice', style: TextStyle(fontWeight: FontWeight.bold, color: ink)),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
+  IconButton(
+    tooltip: 'Chat with your tutor',
+    icon: const Icon(Icons.chat_bubble_rounded, color: blue),
+    onPressed: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TutorChatScreen(
+            learnerType: widget.learnerType,
+            avatarStyle: widget.avatarStyle,
+            tutorVoice: widget.tutorVoice,
+          ),
+        ),
+      );
+    },
+  ),
+          
+class TutorChatScreen extends StatefulWidget {
+  final String learnerType;
+  final String avatarStyle;
+  final String tutorVoice;
+
+  const TutorChatScreen({
+    super.key,
+    required this.learnerType,
+    required this.avatarStyle,
+    required this.tutorVoice,
+  });
+
+  @override
+  State<TutorChatScreen> createState() => _TutorChatScreenState();
+}
+
+class _TutorChatScreenState extends State<TutorChatScreen> {
+  final TextEditingController _controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+
+  final List<Map<String, String>> _messages = [];
+
+  bool get _isChild => widget.learnerType == 'Child';
+
+  @override
+  void initState() {
+    super.initState();
+
+    _messages.add({
+      'speaker': 'tutor',
+      'text': _isChild
+          ? "Hey, superstar reader! 🌟 I'm your reading buddy. We can talk about words, practice sounds, or explore a story. What shall we do?"
+          : "Hello! I'm your reading partner. We can explore words, practice reading patterns, or talk through anything you're finding difficult. Where would you like to start?",
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  String _makeTutorReply(String message) {
+    final text = message.toLowerCase();
+
+    if (text.contains('help') ||
+        text.contains('hard') ||
+        text.contains('difficult') ||
+        text.contains("can't") ||
+        text.contains('stuck')) {
+      return _isChild
+          ? "No problem! Even reading superheroes need a sidekick. 🦸 Let's slow down and tackle just one little sound at a time. Which part is giving you trouble?"
+          : "That's completely okay. Let's take it one step at a time. Tell me which sound, letter, or part of the word is causing trouble, and we'll work through it together.";
+    }
+
+    if (text.contains('joke') || text.contains('funny')) {
+      return _isChild
+          ? "Why did the letter A go to the doctor? Because it wasn't feeling vowel! 😂 Want another one?"
+          : "Here's one for you: Why was the dictionary always calm? It had all the answers. 😄 Want to get back to reading?";
+    }
+
+    if (text.contains('tired') || text.contains('break')) {
+      return _isChild
+          ? "Break time! Even the best reading champions need to recharge. ⭐ We can take a little pause."
+          : "A break is a good idea. Reading takes concentration, and there's no need to rush. We can pick this up whenever you're ready.";
+    }
+
+    if (text.contains('sound') || text.contains('letter')) {
+      return _isChild
+          ? "Let's be sound detectives! 🔎 Say the sound slowly, then we'll see how it fits into the word. What letter are we investigating?"
+          : "Let's examine the sound carefully. We can isolate it, listen to how it works in a word, and then blend the word together.";
+    }
+
+    if (text.contains('story') || text.contains('book')) {
+      return _isChild
+          ? "A story adventure! 📚 Should we explore a mystery, meet a dragon, or discover something amazing in space?"
+          : "Stories are a great way to build reading confidence. We can explore fiction, nonfiction, mysteries, comics, or any topic that interests you.";
+    }
+
+    if (text.contains('hello') || text.contains('hi')) {
+      return _isChild
+          ? "Hello again! 😄 I was just warming up my reading muscles. What should we explore?"
+          : "Hi! Good to have you here. What would you like to work on today?";
+    }
+
+    return _isChild
+        ? "I like that you're talking things through! 😄 Tell me a little more. We can figure it out together, one step at a time."
+        : "Thanks for sharing that with me. Let's explore it together. Would you like to talk it through, look at an example, or practice a word?";
+  }
+
+  void _sendMessage([String? suggestedMessage]) {
+    final message = (suggestedMessage ?? _controller.text).trim();
+
+    if (message.isEmpty) return;
+
+    setState(() {
+      _messages.add({
+        'speaker': 'learner',
+        'text': message,
+      });
+
+      _messages.add({
+        'speaker': 'tutor',
+        'text': _makeTutorReply(message),
+      });
+    });
+
+    _controller.clear();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  Widget _messageBubble(Map<String, String> message) {
+    final isTutor = message['speaker'] == 'tutor';
+
+    return Align(
+      alignment: isTutor ? Alignment.centerLeft : Alignment.centerRight,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 310),
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: isTutor ? Colors.white : const Color(0xFFE9EFFB),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isTutor
+                ? const Color(0xFFE8EAF0)
+                : const Color(0xFFD6E1F5),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              isTutor ? 'Your reading buddy' : 'You',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF778195),
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              message['text'] ?? '',
+              style: const TextStyle(
+                fontSize: 15,
+                color: ink,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: cream,
+        title: const Text(
+          'Tutor conversation',
+          style: TextStyle(
+            color: ink,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              color: const Color(0xFFE9EFFB),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundColor: Colors.white,
+                    child: Icon(
+                      widget.avatarStyle == 'Cartoon'
+                          ? Icons.smart_toy_rounded
+                          : Icons.person_rounded,
+                      color: blue,
+                      size: 30,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isChild
+                              ? 'Your reading sidekick'
+                              : 'Your reading partner',
+                          style: const TextStyle(
+                            color: ink,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '${widget.tutorVoice} · ${widget.learnerType} mode',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF667085),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                controller: _scrollController,
+                padding: const EdgeInsets.all(16),
+                children: _messages.map(_messageBubble).toList(),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ActionChip(
+                    label: const Text('Tell me a joke'),
+                    onPressed: () => _sendMessage('Tell me a joke'),
+                  ),
+                  ActionChip(
+                    label: const Text('Help me read'),
+                    onPressed: () => _sendMessage('I need help reading'),
+                  ),
+                  ActionChip(
+                    label: const Text('Explore a story'),
+                    onPressed: () => _sendMessage('I want to explore a story'),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(
+                  top: BorderSide(color: Color(0xFFE8EAF0)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _sendMessage(),
+                      decoration: InputDecoration(
+                        hintText: _isChild
+                            ? 'Say something to your tutor...'
+                            : 'Type your message...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    onPressed: () => _sendMessage(),
+                    icon: const Icon(Icons.send_rounded),
+                    style: IconButton.styleFrom(
+                      backgroundColor: ink,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Preview conversation · Live AI and voice are not connected yet',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFF8992A1),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+  Padding(
+    padding: const EdgeInsets.only(right: 16),
+    child: Row(children: [
+      const Icon(Icons.star_rounded, color: Color(0xFFE0A526)),
+      Text('$stars', style: const TextStyle(fontWeight: FontWeight.bold, color: ink)),
+    ]),
+  )
+],
             child: Row(children: [
               const Icon(Icons.star_rounded, color: Color(0xFFE0A526)),
               Text('$stars', style: const TextStyle(fontWeight: FontWeight.bold, color: ink)),
