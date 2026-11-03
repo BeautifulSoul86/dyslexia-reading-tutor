@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:speech_to_text/speech_recognition_result.dart' as stt_result;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -582,7 +583,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     }
   }
 
-  void _onSpeechResult(stt.SpeechRecognitionResult result) {
+  void _onSpeechResult(stt_result.SpeechRecognitionResult result) {
     if (!mounted) return;
     setState(() => _recognizedWords = result.recognizedWords);
     if (result.finalResult) _submitRecognizedWords();
