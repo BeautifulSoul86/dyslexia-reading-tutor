@@ -17,31 +17,29 @@ class DyslexiaTutorApp extends StatelessWidget {
   const DyslexiaTutorApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Dyslexia Reading Tutor',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: cream,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF5476B8)),
-        textTheme: const TextTheme(
-          headlineMedium: TextStyle(color: ink, fontWeight: FontWeight.w800),
-          titleLarge: TextStyle(color: ink, fontWeight: FontWeight.w700),
-          bodyLarge: TextStyle(color: ink, height: 1.4),
-        ),
-        cardTheme: CardThemeData(
-          color: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(22),
-            side: const BorderSide(color: Color(0xFFE8EAF0)),
+  Widget build(BuildContext context) => MaterialApp(
+        title: 'Dyslexia Reading Tutor',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          useMaterial3: true,
+          scaffoldBackgroundColor: cream,
+          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF5476B8)),
+          textTheme: const TextTheme(
+            headlineMedium: TextStyle(color: ink, fontWeight: FontWeight.w800),
+            titleLarge: TextStyle(color: ink, fontWeight: FontWeight.w700),
+            bodyLarge: TextStyle(color: ink, height: 1.4),
+          ),
+          cardTheme: CardThemeData(
+            color: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+              side: const BorderSide(color: Color(0xFFE8EAF0)),
+            ),
           ),
         ),
-      ),
-      home: const WelcomeScreen(),
-    );
-  }
+        home: const WelcomeScreen(),
+      );
 }
 
 class WelcomeScreen extends StatefulWidget {
@@ -54,7 +52,7 @@ class WelcomeScreen extends StatefulWidget {
 class _WelcomeScreenState extends State<WelcomeScreen> {
   String learnerType = 'Child';
   String avatarStyle = 'Cartoon';
-  String tutorVoice = 'Warm and encouraging';
+  String tutorVoice = 'Bright and energetic';
 
   @override
   Widget build(BuildContext context) {
@@ -113,12 +111,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
             const SectionTitle('Choose a tutor voice style'),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
-              value: tutorVoice,
-              decoration: const InputDecoration(border: OutlineInputBorder(), filled: true, fillColor: Colors.white),
+              initialValue: tutorVoice,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(), filled: true, fillColor: Colors.white),
               items: const [
-                DropdownMenuItem(value: 'Warm and encouraging', child: Text('Warm and encouraging')),
-                DropdownMenuItem(value: 'Calm and gentle', child: Text('Calm and gentle')),
                 DropdownMenuItem(value: 'Bright and energetic', child: Text('Bright and energetic')),
+                DropdownMenuItem(value: 'Playful and enthusiastic', child: Text('Playful and enthusiastic')),
+                DropdownMenuItem(value: 'Calm and gentle', child: Text('Calm and gentle')),
                 DropdownMenuItem(value: 'Mature and conversational', child: Text('Mature and conversational')),
               ],
               onChanged: (v) => setState(() => tutorVoice = v ?? tutorVoice),
@@ -141,11 +140,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ),
               ),
               icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text('Meet my reading tutor', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+              label: const Text('Meet my reading tutor',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
             ),
             const SizedBox(height: 14),
             const Text(
-              'Starter build: lesson flow and controls are interactive. Live AI conversation and microphone-based scoring are not connected yet.',
+              'Preview build: reading practice and prepared-response chat are interactive. Live AI conversation and microphone-based scoring are not connected yet.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: Color(0xFF7A8494)),
             ),
@@ -203,7 +203,6 @@ class _LessonScreenState extends State<LessonScreen> {
   int supportedAttempts = 0;
   int wordsPracticed = 0;
   bool showSoundBreakdown = false;
-  bool busy = false;
 
   @override
   void initState() {
@@ -241,8 +240,10 @@ class _LessonScreenState extends State<LessonScreen> {
       status = 'start';
       showSoundBreakdown = false;
       tutorMessage = first
-          ? 'Hi! I’m glad we’re learning together. Let’s read a word. Take your time. What sound does the first letter make?'
-          : 'Here is a new word. This one is different, so look carefully at every letter. What sound do you hear at the beginning?';
+          ? (widget.learnerType == 'Child'
+              ? 'Hey, superstar! 🌟 Let’s wake up those reading muscles. What sound does the first letter make?'
+              : 'Welcome. Let’s work through a word carefully. What sound does the first letter make?')
+          : 'Here is a fresh word. Take your time and look carefully at every letter. What sound do you hear at the beginning?';
     });
   }
 
@@ -251,7 +252,9 @@ class _LessonScreenState extends State<LessonScreen> {
       status = 'help';
       showSoundBreakdown = true;
       supportedAttempts++;
-      tutorMessage = 'That’s okay. We don’t guess. Let’s slow it down and work through the sounds together. I’ll show you the sound pattern, then you can try a fresh word.';
+      tutorMessage = widget.learnerType == 'Child'
+          ? 'No worries, word detective! 🔎 We can crack this word together. Let’s slow down and look at each sound.'
+          : 'That is okay. Let’s slow down and work through the sounds one at a time.';
     });
     _saveProgress();
   }
@@ -262,48 +265,230 @@ class _LessonScreenState extends State<LessonScreen> {
       independentReads++;
       stars++;
       wordsPracticed++;
-      tutorMessage = 'Thanks for telling me you decoded it independently. In the full version, I will verify the spoken sounds before recording mastery. For now, this is a practice-session self-report, not an assessed score.';
+      tutorMessage = widget.learnerType == 'Child'
+          ? 'You gave it a try! ⭐ In this preview, I can’t hear or verify your reading yet, but your practice effort counts.'
+          : 'Thanks for recording your attempt. This preview does not verify spoken reading yet, so this is a self-reported practice record.';
     });
     _saveProgress();
   }
 
-  void _nextWord() {
-    _newWord();
-  }
-
-  Color _letterColor(String letter) {
-    const vowels = 'aeiou';
-    return vowels.contains(letter.toLowerCase()) ? blue : coral;
-  }
+  Color _letterColor(String letter) =>
+      'aeiou'.contains(letter.toLowerCase()) ? blue : coral;
 
   @override
   Widget build(BuildContext context) {
     final word = current;
-    if (word == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (word == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final letters = word.word.split('');
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cream,
-        title: const Text('Reading practice', style: TextStyle(fontWeight: FontWeight.bold, color: ink)),
+        title: const Text('Reading practice',
+            style: TextStyle(fontWeight: FontWeight.bold, color: ink)),
         actions: [
-  IconButton(
-    tooltip: 'Chat with your tutor',
-    icon: const Icon(Icons.chat_bubble_rounded, color: blue),
-    onPressed: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => TutorChatScreen(
-            learnerType: widget.learnerType,
-            avatarStyle: widget.avatarStyle,
-            tutorVoice: widget.tutorVoice,
+          IconButton(
+            tooltip: 'Chat with your tutor',
+            icon: const Icon(Icons.chat_bubble_rounded, color: blue),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => TutorChatScreen(
+                    learnerType: widget.learnerType,
+                    avatarStyle: widget.avatarStyle,
+                    tutorVoice: widget.tutorVoice,
+                  ),
+                ),
+              );
+            },
           ),
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Row(children: [
+              const Icon(Icons.star_rounded, color: Color(0xFFE0A526)),
+              Text('$stars', style: const TextStyle(fontWeight: FontWeight.bold, color: ink)),
+            ]),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
+          children: [
+            Row(children: [
+              Expanded(
+                child: Text('${widget.learnerType} mode · CVC words',
+                    style: const TextStyle(fontWeight: FontWeight.w700, color: ink)),
+              ),
+              Text('$wordsPracticed practiced',
+                  style: const TextStyle(color: Color(0xFF667085), fontSize: 12)),
+            ]),
+            const SizedBox(height: 14),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(children: [
+                  Container(
+                    width: 62,
+                    height: 62,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEAF0FB),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Icon(
+                      widget.avatarStyle == 'Cartoon'
+                          ? Icons.smart_toy_rounded
+                          : Icons.person_rounded,
+                      size: 36,
+                      color: blue,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${widget.avatarStyle} tutor · ${widget.tutorVoice}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: ink)),
+                        const SizedBox(height: 5),
+                        Text(tutorMessage,
+                            style: const TextStyle(color: Color(0xFF4D596B), height: 1.4)),
+                      ],
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                child: Column(children: [
+                  const Text('READ THIS WORD',
+                      style: TextStyle(fontSize: 12, letterSpacing: 1.3,
+                          fontWeight: FontWeight.bold, color: Color(0xFF778195))),
+                  const SizedBox(height: 18),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(letters.length, (i) {
+                      final letter = letters[i];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 7),
+                        child: Text(letter, style: TextStyle(
+                            fontSize: 62, fontWeight: FontWeight.w900,
+                            color: _letterColor(letter))),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text('Red = consonants     Blue = vowels',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF667085))),
+                  if (showSoundBreakdown) ...[
+                    const SizedBox(height: 20),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F6FC),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(children: [
+                        const Text('Sound it out, one sound at a time',
+                            style: TextStyle(fontWeight: FontWeight.bold, color: ink)),
+                        const SizedBox(height: 10),
+                        Text(letters.join('   ·   '),
+                            style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold,
+                                color: ink, letterSpacing: 2)),
+                        const SizedBox(height: 6),
+                        Text(word.hint, textAlign: TextAlign.center,
+                            style: const TextStyle(color: Color(0xFF667085))),
+                      ]),
+                    ),
+                  ],
+                ]),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text('Your turn',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: ink)),
+            const SizedBox(height: 6),
+            const Text(
+              'In this preview, choose how the practice went. These buttons do not listen to or verify speech yet.',
+              style: TextStyle(color: Color(0xFF667085), height: 1.4),
+            ),
+            const SizedBox(height: 14),
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(54),
+                backgroundColor: mint,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              ),
+              onPressed: status == 'self_reported' ? null : _independentAttempt,
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text('I decoded it independently'),
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(54),
+                foregroundColor: ink,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              ),
+              onPressed: _needHelp,
+              icon: const Icon(Icons.lightbulb_outline),
+              label: const Text('I need help with this word'),
+            ),
+            if (status == 'help' || status == 'self_reported') ...[
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                  backgroundColor: ink,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                ),
+                onPressed: () {
+                  setState(() {
+                    wordsPracticed++;
+                  });
+                  _saveProgress();
+                  _newWord();
+                },
+                icon: const Icon(Icons.shuffle_rounded),
+                label: const Text('Practice a different word'),
+              ),
+            ],
+            const SizedBox(height: 22),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Practice record on this device',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: ink)),
+                    const SizedBox(height: 10),
+                    _StatLine(label: 'Practice attempts needing help', value: '$supportedAttempts'),
+                    _StatLine(label: 'Self-reported independent reads', value: '$independentReads'),
+                    _StatLine(label: 'Stars earned', value: '$stars'),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Important: independent reading mastery will only be awarded after real speech assessment is connected. Self-reported attempts are kept separate.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF667085), height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
-      );
-    },
-  ),
-          
+      ),
+    );
+  }
+}
+
 class TutorChatScreen extends StatefulWidget {
   final String learnerType;
   final String avatarStyle;
@@ -323,7 +508,6 @@ class TutorChatScreen extends StatefulWidget {
 class _TutorChatScreenState extends State<TutorChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-
   final List<Map<String, String>> _messages = [];
 
   bool get _isChild => widget.learnerType == 'Child';
@@ -331,7 +515,6 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   @override
   void initState() {
     super.initState();
-
     _messages.add({
       'speaker': 'tutor',
       'text': _isChild
@@ -350,46 +533,38 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   String _makeTutorReply(String message) {
     final text = message.toLowerCase();
 
-    if (text.contains('help') ||
-        text.contains('hard') ||
-        text.contains('difficult') ||
-        text.contains("can't") ||
+    if (text.contains('help') || text.contains('hard') ||
+        text.contains('difficult') || text.contains("can't") ||
         text.contains('stuck')) {
       return _isChild
           ? "No problem! Even reading superheroes need a sidekick. 🦸 Let's slow down and tackle just one little sound at a time. Which part is giving you trouble?"
           : "That's completely okay. Let's take it one step at a time. Tell me which sound, letter, or part of the word is causing trouble, and we'll work through it together.";
     }
-
     if (text.contains('joke') || text.contains('funny')) {
       return _isChild
           ? "Why did the letter A go to the doctor? Because it wasn't feeling vowel! 😂 Want another one?"
           : "Here's one for you: Why was the dictionary always calm? It had all the answers. 😄 Want to get back to reading?";
     }
-
     if (text.contains('tired') || text.contains('break')) {
       return _isChild
           ? "Break time! Even the best reading champions need to recharge. ⭐ We can take a little pause."
           : "A break is a good idea. Reading takes concentration, and there's no need to rush. We can pick this up whenever you're ready.";
     }
-
     if (text.contains('sound') || text.contains('letter')) {
       return _isChild
           ? "Let's be sound detectives! 🔎 Say the sound slowly, then we'll see how it fits into the word. What letter are we investigating?"
           : "Let's examine the sound carefully. We can isolate it, listen to how it works in a word, and then blend the word together.";
     }
-
     if (text.contains('story') || text.contains('book')) {
       return _isChild
           ? "A story adventure! 📚 Should we explore a mystery, meet a dragon, or discover something amazing in space?"
           : "Stories are a great way to build reading confidence. We can explore fiction, nonfiction, mysteries, comics, or any topic that interests you.";
     }
-
     if (text.contains('hello') || text.contains('hi')) {
       return _isChild
           ? "Hello again! 😄 I was just warming up my reading muscles. What should we explore?"
           : "Hi! Good to have you here. What would you like to work on today?";
     }
-
     return _isChild
         ? "I like that you're talking things through! 😄 Tell me a little more. We can figure it out together, one step at a time."
         : "Thanks for sharing that with me. Let's explore it together. Would you like to talk it through, look at an example, or practice a word?";
@@ -397,21 +572,12 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
 
   void _sendMessage([String? suggestedMessage]) {
     final message = (suggestedMessage ?? _controller.text).trim();
-
     if (message.isEmpty) return;
 
     setState(() {
-      _messages.add({
-        'speaker': 'learner',
-        'text': message,
-      });
-
-      _messages.add({
-        'speaker': 'tutor',
-        'text': _makeTutorReply(message),
-      });
+      _messages.add({'speaker': 'learner', 'text': message});
+      _messages.add({'speaker': 'tutor', 'text': _makeTutorReply(message)});
     });
-
     _controller.clear();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -427,7 +593,6 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
 
   Widget _messageBubble(Map<String, String> message) {
     final isTutor = message['speaker'] == 'tutor';
-
     return Align(
       alignment: isTutor ? Alignment.centerLeft : Alignment.centerRight,
       child: Container(
@@ -438,31 +603,18 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
           color: isTutor ? Colors.white : const Color(0xFFE9EFFB),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: isTutor
-                ? const Color(0xFFE8EAF0)
-                : const Color(0xFFD6E1F5),
+            color: isTutor ? const Color(0xFFE8EAF0) : const Color(0xFFD6E1F5),
           ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              isTutor ? 'Your reading buddy' : 'You',
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF778195),
-              ),
-            ),
+            Text(isTutor ? 'Your reading buddy' : 'You',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
+                    color: Color(0xFF778195))),
             const SizedBox(height: 5),
-            Text(
-              message['text'] ?? '',
-              style: const TextStyle(
-                fontSize: 15,
-                color: ink,
-                height: 1.4,
-              ),
-            ),
+            Text(message['text'] ?? '',
+                style: const TextStyle(fontSize: 15, color: ink, height: 1.4)),
           ],
         ),
       ),
@@ -474,13 +626,8 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: cream,
-        title: const Text(
-          'Tutor conversation',
-          style: TextStyle(
-            color: ink,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        title: const Text('Tutor conversation',
+            style: TextStyle(color: ink, fontWeight: FontWeight.bold)),
       ),
       body: SafeArea(
         child: Column(
@@ -489,45 +636,28 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               color: const Color(0xFFE9EFFB),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 25,
-                    backgroundColor: Colors.white,
-                    child: Icon(
-                      widget.avatarStyle == 'Cartoon'
-                          ? Icons.smart_toy_rounded
-                          : Icons.person_rounded,
-                      color: blue,
-                      size: 30,
-                    ),
+              child: Row(children: [
+                CircleAvatar(
+                  radius: 25,
+                  backgroundColor: Colors.white,
+                  child: Icon(
+                    widget.avatarStyle == 'Cartoon'
+                        ? Icons.smart_toy_rounded : Icons.person_rounded,
+                    color: blue, size: 30),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_isChild ? 'Your reading sidekick' : 'Your reading partner',
+                          style: const TextStyle(color: ink, fontWeight: FontWeight.bold)),
+                      Text('${widget.tutorVoice} · ${widget.learnerType} mode',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF667085))),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _isChild
-                              ? 'Your reading sidekick'
-                              : 'Your reading partner',
-                          style: const TextStyle(
-                            color: ink,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          '${widget.tutorVoice} · ${widget.learnerType} mode',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF667085),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ]),
             ),
             Expanded(
               child: ListView(
@@ -542,18 +672,12 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  ActionChip(
-                    label: const Text('Tell me a joke'),
-                    onPressed: () => _sendMessage('Tell me a joke'),
-                  ),
-                  ActionChip(
-                    label: const Text('Help me read'),
-                    onPressed: () => _sendMessage('I need help reading'),
-                  ),
-                  ActionChip(
-                    label: const Text('Explore a story'),
-                    onPressed: () => _sendMessage('I want to explore a story'),
-                  ),
+                  ActionChip(label: const Text('Tell me a joke'),
+                      onPressed: () => _sendMessage('Tell me a joke')),
+                  ActionChip(label: const Text('Help me read'),
+                      onPressed: () => _sendMessage('I need help reading')),
+                  ActionChip(label: const Text('Explore a story'),
+                      onPressed: () => _sendMessage('I want to explore a story')),
                 ],
               ),
             ),
@@ -561,187 +685,34 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
               decoration: const BoxDecoration(
                 color: Colors.white,
-                border: Border(
-                  top: BorderSide(color: Color(0xFFE8EAF0)),
+                border: Border(top: BorderSide(color: Color(0xFFE8EAF0))),
+              ),
+              child: Row(children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _sendMessage(),
+                    decoration: InputDecoration(
+                      hintText: _isChild ? 'Say something to your tutor...' : 'Type your message...',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(18)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                  ),
                 ),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendMessage(),
-                      decoration: InputDecoration(
-                        hintText: _isChild
-                            ? 'Say something to your tutor...'
-                            : 'Type your message...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: () => _sendMessage(),
-                    icon: const Icon(Icons.send_rounded),
-                    style: IconButton.styleFrom(
-                      backgroundColor: ink,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  onPressed: () => _sendMessage(),
+                  icon: const Icon(Icons.send_rounded),
+                  style: IconButton.styleFrom(backgroundColor: ink, foregroundColor: Colors.white),
+                ),
+              ]),
             ),
             const Padding(
               padding: EdgeInsets.only(bottom: 8),
               child: Text(
                 'Preview conversation · Live AI and voice are not connected yet',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Color(0xFF8992A1),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-  Padding(
-    padding: const EdgeInsets.only(right: 16),
-    child: Row(children: [
-      const Icon(Icons.star_rounded, color: Color(0xFFE0A526)),
-      Text('$stars', style: const TextStyle(fontWeight: FontWeight.bold, color: ink)),
-    ]),
-  )
-],
-            child: Row(children: [
-              const Icon(Icons.star_rounded, color: Color(0xFFE0A526)),
-              Text('$stars', style: const TextStyle(fontWeight: FontWeight.bold, color: ink)),
-            ]),
-          )
-        ],
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
-          children: [
-            Row(
-              children: [
-                Expanded(child: Text('${widget.learnerType} mode · CVC words', style: const TextStyle(fontWeight: FontWeight.w700, color: ink))),
-                Text('${wordsPracticed} practiced', style: const TextStyle(color: Color(0xFF667085), fontSize: 12)),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 62, height: 62,
-                      decoration: BoxDecoration(color: const Color(0xFFEAF0FB), borderRadius: BorderRadius.circular(20)),
-                      child: Icon(widget.avatarStyle == 'Cartoon' ? Icons.smart_toy_rounded : Icons.person_rounded, size: 36, color: blue),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('${widget.avatarStyle} tutor · ${widget.tutorVoice}', style: const TextStyle(fontWeight: FontWeight.bold, color: ink)),
-                        const SizedBox(height: 5),
-                        Text(tutorMessage, style: const TextStyle(color: Color(0xFF4D596B), height: 1.4)),
-                      ]),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-                child: Column(
-                  children: [
-                    const Text('READ THIS WORD', style: TextStyle(fontSize: 12, letterSpacing: 1.3, fontWeight: FontWeight.bold, color: Color(0xFF778195))),
-                    const SizedBox(height: 18),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(letters.length, (i) {
-                        final letter = letters[i];
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 7),
-                          child: Text(letter, style: TextStyle(fontSize: 62, fontWeight: FontWeight.w900, color: _letterColor(letter))),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text('Red = consonants     Blue = vowels', style: TextStyle(fontSize: 12, color: Color(0xFF667085))),
-                    if (showSoundBreakdown) ...[
-                      const SizedBox(height: 20),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(color: const Color(0xFFF3F6FC), borderRadius: BorderRadius.circular(14)),
-                        child: Column(children: [
-                          const Text('Sound it out, one sound at a time', style: TextStyle(fontWeight: FontWeight.bold, color: ink)),
-                          const SizedBox(height: 10),
-                          Text(letters.join('   ·   '), style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold, color: ink, letterSpacing: 2)),
-                          const SizedBox(height: 6),
-                          Text(word.hint, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF667085))),
-                        ]),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            const Text('Your turn', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: ink)),
-            const SizedBox(height: 6),
-            const Text('In this starter build, choose how the practice went. These buttons do not listen to or verify speech yet.', style: TextStyle(color: Color(0xFF667085), height: 1.4)),
-            const SizedBox(height: 14),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54), backgroundColor: mint, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-              onPressed: status == 'self_reported' ? null : _independentAttempt,
-              icon: const Icon(Icons.check_circle_outline),
-              label: const Text('I decoded it independently'),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(54), foregroundColor: ink, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-              onPressed: _needHelp,
-              icon: const Icon(Icons.lightbulb_outline),
-              label: const Text('I need help with this word'),
-            ),
-            if (status == 'help' || status == 'self_reported') ...[
-              const SizedBox(height: 10),
-              FilledButton.icon(
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52), backgroundColor: ink, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))),
-                onPressed: _nextWord,
-                icon: const Icon(Icons.shuffle_rounded),
-                label: const Text('Practice a different word'),
-              ),
-            ],
-            const SizedBox(height: 22),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Practice record on this device', style: TextStyle(fontWeight: FontWeight.bold, color: ink)),
-                  const SizedBox(height: 10),
-                  _StatLine(label: 'Practice attempts needing help', value: '$supportedAttempts'),
-                  _StatLine(label: 'Self-reported independent reads', value: '$independentReads'),
-                  _StatLine(label: 'Stars earned', value: '$stars'),
-                  const SizedBox(height: 8),
-                  const Text('Important: independent reading mastery will only be awarded after real speech assessment is connected. Self-reported attempts are kept separate.', style: TextStyle(fontSize: 12, color: Color(0xFF667085), height: 1.4)),
-                ]),
+                style: TextStyle(fontSize: 10, color: Color(0xFF8992A1)),
               ),
             ),
           ],
@@ -756,7 +727,10 @@ class SectionTitle extends StatelessWidget {
   const SectionTitle(this.text, {super.key});
 
   @override
-  Widget build(BuildContext context) => Text(text, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: ink));
+  Widget build(BuildContext context) => Text(
+        text,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: ink),
+      );
 }
 
 class _StatLine extends StatelessWidget {
@@ -765,13 +739,11 @@ class _StatLine extends StatelessWidget {
   const _StatLine({required this.label, required this.value});
 
   @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(children: [
-        Expanded(child: Text(label, style: const TextStyle(color: Color(0xFF667085)))),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, color: ink)),
-      ]),
-    );
-  }
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(children: [
+          Expanded(child: Text(label, style: const TextStyle(color: Color(0xFF667085)))),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, color: ink)),
+        ]),
+      );
 }
