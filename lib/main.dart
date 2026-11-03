@@ -349,22 +349,39 @@ class _LessonScreenState extends State<LessonScreen> {
   }
 
   void _onLessonSpeechResult(stt_result.SpeechRecognitionResult result) {
-    if (!mounted) return;
-    setState(() => _recognizedWords = result.recognizedWords);
-    if (result.finalResult && !_isListening) _scheduleLessonEvaluation();
-  }
+  if (!mounted || _lessonSessionHandled) return;
 
-  void _scheduleLessonEvaluation() {
-    if (_lessonSessionHandled || _lessonEvaluationScheduled) return;
-    _lessonEvaluationScheduled = true;
-    Future<void>.delayed(const Duration(milliseconds: 900), () {
+  setState(() {
+    _recognizedWords = result.recognizedWords;
+  });
+
+  if (result.finalResult && !_isListening) {
+    _scheduleLessonEvaluation();
+  }
+}
+
+void _scheduleLessonEvaluation() {
+  if (_lessonSessionHandled) return;
+
+  // Each new recognition result restarts the waiting period.
+  // This gives Android time to deliver its final transcript.
+  _lessonEvaluationTimer?.cancel();
+
+  _lessonEvaluationScheduled = true;
+
+  _lessonEvaluationTimer = Timer(
+    const Duration(milliseconds: 1400),
+    () {
       if (!mounted || _lessonSessionHandled) return;
+
       _lessonSessionHandled = true;
       _lessonEvaluationScheduled = false;
-      _evaluateSpokenAttempt();
-    });
-  }
 
+      _evaluateSpokenAttempt();
+    },
+  );
+}
+  
   void _evaluateSpokenAttempt() {
     final heard = _recognizedWords.trim();
     if (heard.isEmpty) {
