@@ -230,7 +230,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'Reading Lounge replies are currently built-in responses, not live AI chat.',
+                  'Reading Lounge replies are built-in for now. A live AI tutor is a future feature.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
@@ -245,6 +245,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     );
   }
 }
+
 class LessonScreen extends StatefulWidget {
   final String learnerType;
   final String avatarStyle;
@@ -285,6 +286,7 @@ class _LessonScreenState extends State<LessonScreen> {
   bool lessonSessionHandled = false;
   bool isSpeaking = false;
   bool guidedPracticeStarted = false;
+  bool isEmergencySubmission = false;
 
   String recognizedWords = '';
   String statusMessage = 'Tap the microphone when you are ready.';
@@ -458,6 +460,7 @@ class _LessonScreenState extends State<LessonScreen> {
     evaluationTimer?.cancel();
     lessonSessionHandled = false;
     recognizedWords = '';
+    isEmergencySubmission = false;
 
     setState(() {
       showEmergencyTyping = false;
@@ -526,63 +529,39 @@ class _LessonScreenState extends State<LessonScreen> {
     final heardList = heard.split(RegExp(r'\s+'));
 
     if (heardList.contains(target)) {
+      final independent =
+          !guidedPracticeStarted && !isEmergencySubmission;
+
       setState(() {
-        statusMessage = 'I heard the word "$target"!';
-        tutorMessage = isChild
-            ? 'You said $target! That is worth celebrating!'
-            : 'I recognized the target word, $target. Let’s record your attempt.';
+        statusMessage = isEmergencySubmission
+            ? 'Your backup response matches the word.'
+            : 'I heard the word "$target"!';
+        tutorMessage = isEmergencySubmission
+            ? 'Your backup response matches. Let’s keep practicing!'
+            : independent
+                ? (isChild
+                    ? 'You read $target without using the sound guide. Fantastic!'
+                    : 'I recognized $target without the sound guide. Well done.')
+                : (isChild
+                    ? 'You used your sound guide and read $target. Great work!'
+                    : 'I recognized $target after guided practice. Well done.');
       });
 
-      _askForSelfConfirmation();
+      _awardWord(independent: independent);
     } else {
       setState(() {
         statusMessage = heard.isEmpty
             ? 'I did not catch that. Try again when you are ready.'
-            : 'I heard "$heard". Let’s practice the word together.';
+            : 'I heard "$heard". Let’s try the word again.';
 
         tutorMessage = isChild
-            ? 'That’s okay! Reading takes practice. Let’s break it into sounds.'
-            : 'That attempt was not clearly recognized. We can try again or use the sound guide.';
+            ? 'That’s okay! Reading takes practice. You can try again or let me help with the sounds.'
+            : 'That attempt was not clearly recognized. Try again, or use the sound guide.';
+        lessonSessionHandled = false;
       });
 
       _speak(tutorMessage);
     }
-  }
-
-  Future<void> _askForSelfConfirmation() async {
-    final answer = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('How did you read it?'),
-          content: const Text(
-            'Did you work out the word on your own, or did you use the sound guide?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('I used the sound guide'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('I read it on my own'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (!mounted || answer == null) {
-      if (mounted) {
-        setState(() {
-          lessonSessionHandled = false;
-          statusMessage = 'Choose how you would like to continue.';
-        });
-      }
-      return;
-    }
-
-    _awardWord(independent: answer);
   }
 
   Future<void> _awardWord({required bool independent}) async {
@@ -608,7 +587,7 @@ class _LessonScreenState extends State<LessonScreen> {
                 'Nice work using your reading tools!',
               ]
             : [
-                'Good work using the sound guide.',
+                'Good work using the sound guide or backup practice.',
                 'You completed a supported practice attempt.',
                 'That is useful practice. Keep building on it.',
               ]);
@@ -642,16 +621,24 @@ class _LessonScreenState extends State<LessonScreen> {
     await _saveProgress();
     await _speak(rewardMessage);
   }
-
-  Future<void> _startGuidedHelp() async {
+    Future<void> _startGuidedHelp() async {
     if (wordRewarded) return;
+
+    if (isListening) {
+      await lessonSpeech.stop();
+    }
+
+    evaluationTimer?.cancel();
 
     setState(() {
       guidedStep = 0;
       guidedPracticeStarted = true;
+      lessonSessionHandled = true;
+      isListening = false;
+      recognizedWords = '';
+      isEmergencySubmission = false;
       tutorMessage = 'Let’s take this word one sound at a time.';
       statusMessage = 'Sound 1 of ${currentWord.sounds.length}';
-      lessonSessionHandled = true;
     });
 
     await _speak(tutorMessage);
@@ -709,8 +696,9 @@ class _LessonScreenState extends State<LessonScreen> {
       });
 
       await _speak(
-        'Now blend the sounds together. ${currentWord.sounds.join(', ')}. '
-        'What word do they make?',
+        'Now blend the sounds together. '
+        '${currentWord.sounds.join(', ')}. '
+        'When you are ready, read the whole word aloud.',
       );
       return;
     }
@@ -737,44 +725,18 @@ class _LessonScreenState extends State<LessonScreen> {
     }
 
     setState(() {
-      tutorMessage = 'You practiced the sounds and blending. How did it go?';
-      statusMessage = 'You completed the guided practice.';
+      tutorMessage = 'Your turn! Read the whole word aloud so I can listen.';
+      statusMessage = 'Ready to read the whole word.';
+      lessonSessionHandled = false;
     });
 
-    final answer = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('How did that feel?'),
-          content: const Text(
-            'Did you try blending the sounds into the whole word?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('I want to practice again'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Yes, I tried it!'),
-            ),
-          ],
-        );
-      },
+    await _speak(
+      'Your turn! Read the whole word aloud. '
+      'I am listening for the word ${currentWord.word}.',
     );
 
     if (!mounted) return;
-
-    if (answer == true) {
-      await _awardWord(independent: false);
-    } else {
-      setState(() {
-        guidedStep = 0;
-        statusMessage = 'No rush. Let’s try those sounds again.';
-      });
-
-      await _speak('No rush. We can practice those sounds again.');
-    }
+    await _toggleLessonMicrophone();
   }
 
   Future<void> _submitEmergencyTyping() async {
@@ -783,6 +745,7 @@ class _LessonScreenState extends State<LessonScreen> {
 
     recognizedWords = typed;
     lessonSessionHandled = false;
+    isEmergencySubmission = true;
     FocusScope.of(context).unfocus();
 
     setState(() {
@@ -807,6 +770,7 @@ class _LessonScreenState extends State<LessonScreen> {
       isListening = false;
       wordRewarded = false;
       lessonSessionHandled = false;
+      isEmergencySubmission = false;
       recognizedWords = '';
       emergencyText = '';
       emergencyController.clear();
@@ -838,7 +802,8 @@ class _LessonScreenState extends State<LessonScreen> {
     emergencyController.dispose();
     super.dispose();
   }
-    @override
+
+  @override
   Widget build(BuildContext context) {
     final word = currentWord;
     final soundPracticeFinished =
@@ -909,7 +874,7 @@ class _LessonScreenState extends State<LessonScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Stars reflect your practice choices and self-reported reading, not an automatic reading test.',
+                        'Stars are practice feedback, not a formal reading assessment. The microphone checks whether it recognized the target word.',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade700,
@@ -1115,7 +1080,7 @@ class _LessonScreenState extends State<LessonScreen> {
                         ),
                         const SizedBox(height: 6),
                         const Text(
-                          'This is only a backup if speech recognition is unavailable. You can retry the microphone after checking its permission.',
+                          'This is only a backup if speech recognition is unavailable. Typed answers are recorded as supported practice, not independent microphone reads.',
                         ),
                         const SizedBox(height: 10),
                         TextField(
@@ -1211,7 +1176,7 @@ class _LessonScreenState extends State<LessonScreen> {
                           onPressed: _advanceGuidedStep,
                           child: Text(
                             soundPracticeFinished
-                                ? 'I tried blending the word!'
+                                ? 'Read the whole word aloud'
                                 : 'I tried it! Next sound',
                           ),
                         ),
@@ -1268,7 +1233,6 @@ class _LessonScreenState extends State<LessonScreen> {
     );
   }
 }
-
 class TutorChatScreen extends StatefulWidget {
   final String learnerType;
   final String tutorVoice;
@@ -1289,12 +1253,13 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   final FlutterTts chatTts = FlutterTts();
   final TextEditingController messageController =
       TextEditingController();
+  final Random random = Random();
 
   final List<Map<String, String>> messages = [
     {
       'speaker': 'Tutor',
       'message':
-          'Welcome to the Reading Lounge! What would you like to talk about?',
+          'Welcome to the Reading Lounge! We can talk about books, animals, games, stories, or anything you find interesting. What sounds fun?',
     },
   ];
 
@@ -1305,6 +1270,7 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
 
   String heardWords = '';
   String statusMessage = 'Tap the microphone to talk.';
+  String lastReply = '';
 
   bool get isChild => widget.learnerType == 'Child';
 
@@ -1351,15 +1317,15 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
       setState(() {
         if (!chatSpeechAvailable) {
           statusMessage =
-              'Speech recognition is unavailable on this device.';
+              'Speech recognition is unavailable. You can still type a message.';
         }
       });
     }
 
     await _speak(
       isChild
-          ? 'Hey there! Welcome to the Reading Lounge. Let’s chat!'
-          : 'Welcome to the Reading Lounge. What would you like to discuss?',
+          ? 'Hey there! Welcome to the Reading Lounge. We can talk about stories, play word games, or make up an adventure together!'
+          : 'Welcome to the Reading Lounge. We can explore stories, reading ideas, and word activities together.',
     );
   }
 
@@ -1461,6 +1427,8 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   }
 
   void _sendMessage(String message) {
+    if (message.trim().isEmpty) return;
+
     final reply = _makeReply(message);
 
     setState(() {
@@ -1481,36 +1449,259 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     _speak(reply);
   }
 
+  String _pickReply(List<String> choices) {
+    if (choices.isEmpty) return 'Tell me more!';
+
+    final available = choices
+        .where((choice) => choice != lastReply)
+        .toList();
+
+    final selection = available.isEmpty
+        ? choices[random.nextInt(choices.length)]
+        : available[random.nextInt(available.length)];
+
+    lastReply = selection;
+    return selection;
+  }
+
   String _makeReply(String message) {
-    final text = message.toLowerCase();
+    final text = message.toLowerCase().trim();
+    final userTurnCount =
+        messages.where((item) => item['speaker'] == 'You').length;
 
-    if (text.contains('help') || text.contains('hard')) {
-      return isChild
-          ? 'That’s okay! We can slow down and take it one little step at a time. Which word are you working on?'
-          : 'That is understandable. We can slow down, break the word into smaller parts, and work through it together.';
+    final isGreeting = RegExp(
+      r'\b(hello|hi|hey|good morning|good afternoon)\b',
+    ).hasMatch(text);
+
+    if (isGreeting) {
+      return _pickReply(
+        isChild
+            ? [
+                'Hey! I was hoping you would visit. What adventure should we go on today?',
+                'Hello, friend! Want to talk about a story, play a word game, or hear a joke?',
+                'Hi there! What has been the most interesting part of your day?',
+              ]
+            : [
+                'Hello! What would you like to explore today?',
+                'Good to see you. Would you prefer a story discussion or a little reading practice?',
+                'Hello! What is on your mind today?',
+              ],
+      );
     }
 
-    if (text.contains('book') || text.contains('story')) {
-      return isChild
-          ? 'Stories are full of adventures! We can talk about characters, places, and what might happen next. What kind of story do you like?'
-          : 'Stories are a great way to build reading confidence. What genres or topics do you enjoy?';
+    if (RegExp(r'\b(help|hard|difficult|stuck|cannot|can\'t)\b')
+        .hasMatch(text)) {
+      return _pickReply(
+        isChild
+            ? [
+                'No problem. Even tricky words can be solved one sound at a time. What word is giving you trouble?',
+                'We can slow everything down. Do you want me to say the word, break it into sounds, or try it together?',
+                'You do not have to rush. Tell me which part feels tricky, and we will work on it together.',
+              ]
+            : [
+                'We can approach that in smaller steps. Which word or part is causing difficulty?',
+                'Let’s slow it down and look at the sounds or syllables. What are you working on?',
+                'That is okay. Would another example or a sound-by-sound breakdown help?',
+              ],
+      );
     }
 
-    if (text.contains('hello') || text.contains('hi')) {
-      return isChild
-          ? 'Hello, reading superstar! What shall we explore today?'
-          : 'Hello! It is good to have you here. What would you like to practice?';
+    if (RegExp(r'\b(sad|upset|angry|frustrated|tired|scared|worried)\b')
+        .hasMatch(text)) {
+      return _pickReply(
+        isChild
+            ? [
+                'That sounds like a tough feeling. We can take a little break. Would you like a silly joke or a calm story?',
+                'I am glad you told me. You do not have to get everything right. What happened?',
+                'Let’s make things easier for a moment. Would you like to talk, listen to a story, or play a tiny game?',
+              ]
+            : [
+                'Thanks for telling me. We can slow down or take a break. What would feel most helpful right now?',
+                'That sounds frustrating. Would you like to talk through it or switch to something lighter?',
+                'There is no need to push through when you are tired. What would make this session easier?',
+              ],
+      );
     }
 
-    if (text.contains('thank')) {
-      return isChild
-          ? 'You are very welcome! Every bit of practice counts.'
-          : 'You are welcome. Keep going at a pace that works for you.';
+    if (RegExp(r'\b(happy|excited|awesome|great|yay|fun|love it)\b')
+        .hasMatch(text)) {
+      return _pickReply(
+        isChild
+            ? [
+                'That is wonderful! What was the best part? I want to hear all about it!',
+                'Your excitement is contagious! What should we celebrate first?',
+                'Fantastic! What happened next?',
+              ]
+            : [
+                'That is great to hear. What do you think made it go so well?',
+                'Wonderful. Would you like to build on that success with another activity?',
+                'I like hearing that. What would you like to try next?',
+              ],
+      );
     }
 
-    return isChild
-        ? 'That sounds interesting! Tell me a little more. I am listening!'
-        : 'Thanks for sharing that. Tell me a little more, and we can explore it together.';
+    if (RegExp(r'\b(joke|funny|laugh)\b').hasMatch(text)) {
+      final jokes = isChild
+          ? [
+              'Why did the teddy bear say no to dessert? Because it was stuffed! Want another joke?',
+              'What do you call a sleeping dinosaur? A dino-snore! Should I tell you another?',
+              'Why did the book go to the doctor? It had too many issues! Want to hear another?',
+            ]
+          : [
+              'Why did the book go to the doctor? It had too many issues. Would you like another?',
+              'I tried to write a joke about a pencil, but it had no point. Want another?',
+              'Why are books so good at keeping secrets? They always keep things under cover. Shall we try another?',
+            ];
+      return _pickReply(jokes);
+    }
+
+    if (RegExp(r'\b(animal|dog|cat|puppy|kitten|bird|horse|fish|pet)\b')
+        .hasMatch(text)) {
+      return _pickReply(
+        isChild
+            ? [
+                'Animals make excellent story characters! What is your favorite animal, and what would you name it?',
+                'If your pet could talk, what do you think it would say first?',
+                'Let’s invent an animal adventure! Where should our animal explorer go?',
+              ]
+            : [
+                'Animals can make wonderful story subjects. Do you have a favorite?',
+                'What do you find most interesting about that animal?',
+                'Would you enjoy reading a funny animal story or learning real facts about animals?',
+              ],
+      );
+    }
+
+    if (RegExp(r'\b(book|books|comic|comics|story|stories|reading)\b')
+        .hasMatch(text)) {
+      return _pickReply(
+        isChild
+            ? [
+                'Let’s go on a story adventure! Do you like funny stories, superheroes, animals, mysteries, or magic?',
+                'If we made our own comic, who would be the hero? What would their superpower be?',
+                'I love a good story. Do you like choosing what happens next, or being surprised?',
+              ]
+            : [
+                'What kinds of books do you enjoy most: mystery, fantasy, adventure, history, comics, or something else?',
+                'Would you rather explore a new story or talk about a book you already enjoy?',
+                'What makes a book hard to put down for you: the characters, the mystery, or the world?',
+              ],
+      );
+    }
+
+    if (RegExp(r'\b(game|play|playing|bored)\b').hasMatch(text)) {
+      return _pickReply(
+        isChild
+            ? [
+                'Game time! Want to be a word detective? I can give you clues and you can guess the word.',
+                'Let’s play! We could make a silly story one sentence at a time. What should the first sentence be?',
+                'How about a word adventure? Pick an animal, a place, and a mystery, and we will make a story!',
+              ]
+            : [
+                'We can switch things up. Would a word challenge, a short story prompt, or a quick reading game be more interesting?',
+                'Let’s make practice feel less like practice. What kind of game would you enjoy?',
+                'Would you like a vocabulary challenge or a creative writing prompt?',
+              ],
+      );
+    }
+
+    if (RegExp(r'\b(school|teacher|class|homework|friend)\b')
+        .hasMatch(text)) {
+      return _pickReply(
+        isChild
+            ? [
+                'Tell me about it! What was the most interesting thing that happened at school?',
+                'Was there something fun or tricky about your day?',
+                'If you could choose one thing to learn about tomorrow, what would it be?',
+              ]
+            : [
+                'How has that been going? Is there anything you would like help thinking through?',
+                'What part of that has been most interesting or challenging?',
+                'Would it help to practice something from class together?',
+              ],
+      );
+    }
+
+    if (RegExp(r'\b(thank|thanks|thank you)\b').hasMatch(text)) {
+      return _pickReply(
+        isChild
+            ? [
+                'You are very welcome! What shall we explore next?',
+                'Anytime! Our next adventure is waiting.',
+                'You got it! Want a joke, a story, or a word game next?',
+              ]
+            : [
+                'You are welcome. What would you like to work on next?',
+                'Glad I could help. Would you like to continue or try something different?',
+                'Anytime. We can keep going whenever you are ready.',
+              ],
+      );
+    }
+
+    if (RegExp(r'\b(bye|goodbye|see you|later)\b').hasMatch(text)) {
+      return _pickReply(
+        isChild
+            ? [
+                'See you next time, reader! Keep your imagination busy until our next adventure!',
+                'Bye for now! I will be ready for another story when you return.',
+                'Until next time! Happy reading!',
+              ]
+            : [
+                'Goodbye for now. You can return whenever you are ready to read.',
+                'Take care, and keep practicing at your own pace.',
+                'See you next time. Thanks for spending some reading time here.',
+              ],
+      );
+    }
+
+    final cleanMessage = message.trim().replaceAll(
+          RegExp(r'\s+'),
+          ' ',
+        );
+
+    final shortMessage = cleanMessage.length > 65
+        ? '${cleanMessage.substring(0, 65)}...'
+        : cleanMessage;
+
+    final genericReplies = isChild
+        ? [
+            'You said "$shortMessage". Tell me more! What happened next?',
+            'That gives me an idea! What is your favorite part about that?',
+            'Interesting! If that became a story, what do you think would happen next?',
+            'I am listening! Can you tell me one more thing about it?',
+            'Let’s explore that. What made you think of it?',
+          ]
+        : [
+            'You mentioned "$shortMessage". What would you like to explore about it?',
+            'That is interesting. What do you think about it?',
+            'Tell me a little more. What part stands out to you?',
+            'We can explore that together. What would you like to know?',
+            'I am following. What happened next?',
+          ];
+
+    final followUpReplies = isChild
+        ? [
+            'And then what happened?',
+            'What do you think should happen next?',
+            'If you could change one thing, what would it be?',
+            'What would you name the main character?',
+          ]
+        : [
+            'What else comes to mind?',
+            'What would you like to explore next?',
+            'What do you think is the most important part?',
+            'Would you like to take that idea a little further?',
+          ];
+
+    if (userTurnCount >= 2 && random.nextBool()) {
+      return _pickReply(followUpReplies);
+    }
+
+    return _pickReply(genericReplies);
+  }
+
+  void _sendQuickPrompt(String prompt) {
+    _sendMessage(prompt);
   }
 
   @override
@@ -1526,6 +1717,17 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reading Lounge'),
+        actions: [
+          IconButton(
+            tooltip: 'Hear tutor welcome',
+            onPressed: () => _speak(
+              isChild
+                  ? 'Welcome back! What adventure should we explore?'
+                  : 'Welcome back to the Reading Lounge. What would you like to explore?',
+            ),
+            icon: const Icon(Icons.volume_up_rounded),
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -1584,6 +1786,54 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
               child: Column(
                 children: [
+                  if (isChild) ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Try an activity:',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        ActionChip(
+                          avatar: const Icon(
+                            Icons.sentiment_very_satisfied,
+                            size: 18,
+                          ),
+                          label: const Text('Tell me a joke'),
+                          onPressed: () =>
+                              _sendQuickPrompt('Tell me a joke'),
+                        ),
+                        ActionChip(
+                          avatar: const Icon(
+                            Icons.auto_stories_rounded,
+                            size: 18,
+                          ),
+                          label: const Text('Make a story'),
+                          onPressed: () =>
+                              _sendQuickPrompt('Let’s make a story'),
+                        ),
+                        ActionChip(
+                          avatar: const Icon(
+                            Icons.extension_rounded,
+                            size: 18,
+                          ),
+                          label: const Text('Play a word game'),
+                          onPressed: () =>
+                              _sendQuickPrompt('Let’s play a word game'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   Text(
                     statusMessage,
                     textAlign: TextAlign.center,
