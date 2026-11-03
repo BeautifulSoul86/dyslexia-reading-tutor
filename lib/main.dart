@@ -2,25 +2,17 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:speech_to_text/speech_recognition_result.dart' as stt_result;
-import 'package:flutter_tts/flutter_tts.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const DyslexiaTutorApp());
+  runApp(const DyslexiaReadingTutorApp());
 }
 
-const Color ink = Color(0xFF243247);
-const Color coral = Color(0xFFE05252);
-const Color blue = Color(0xFF3478D4);
-const Color mint = Color(0xFF2F9B78);
-const Color cream = Color(0xFFFFFBF4);
-const Color gold = Color(0xFFE0A526);
-
-class DyslexiaTutorApp extends StatelessWidget {
-  const DyslexiaTutorApp({super.key});
+class DyslexiaReadingTutorApp extends StatelessWidget {
+  const DyslexiaReadingTutorApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -29,25 +21,16 @@ class DyslexiaTutorApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        scaffoldBackgroundColor: cream,
-        colorScheme: ColorScheme.fromSeed(seedColor: blue),
-        textTheme: const TextTheme(
-          headlineMedium: TextStyle(
-            color: ink,
-            fontWeight: FontWeight.w800,
-          ),
-          titleLarge: TextStyle(
-            color: ink,
-            fontWeight: FontWeight.w700,
-          ),
-          bodyLarge: TextStyle(color: ink, height: 1.4),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF6558C9),
+          brightness: Brightness.light,
         ),
+        scaffoldBackgroundColor: const Color(0xFFF7F6FC),
         cardTheme: CardThemeData(
           color: Colors.white,
-          elevation: 0,
+          elevation: 1,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(22),
-            side: const BorderSide(color: Color(0xFFE8EAF0)),
           ),
         ),
       ),
@@ -55,6 +38,27 @@ class DyslexiaTutorApp extends StatelessWidget {
     );
   }
 }
+
+class WordCard {
+  final String word;
+  final String meaning;
+  final List<String> sounds;
+
+  const WordCard(this.word, this.meaning, this.sounds);
+}
+
+const List<WordCard> wordBank = [
+  WordCard('cat', 'A furry pet that says meow.', ['c', 'a', 't']),
+  WordCard('map', 'A picture that helps us find places.', ['m', 'a', 'p']),
+  WordCard('sun', 'The bright star that lights our day.', ['s', 'u', 'n']),
+  WordCard('bed', 'A cozy place to sleep.', ['b', 'e', 'd']),
+  WordCard('sit', 'To rest on a chair or seat.', ['s', 'i', 't']),
+  WordCard('hop', 'To jump on one foot or both feet.', ['h', 'o', 'p']),
+  WordCard('lip', 'The soft edge of your mouth.', ['l', 'i', 'p']),
+  WordCard('mug', 'A cup you can drink from.', ['m', 'u', 'g']),
+  WordCard('pet', 'An animal cared for at home.', ['p', 'e', 't']),
+  WordCard('dot', 'A tiny round mark.', ['d', 'o', 't']),
+];
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -65,192 +69,182 @@ class WelcomeScreen extends StatefulWidget {
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
   String learnerType = 'Child';
-  String avatarStyle = 'Cartoon';
-  String tutorVoice = 'Bright and energetic';
+  String avatarStyle = 'Friendly cartoon';
+  String tutorVoice = 'Bright and cheerful';
+
+  void _start() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => LessonScreen(
+          learnerType: learnerType,
+          avatarStyle: avatarStyle,
+          tutorVoice: tutorVoice,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isChild = learnerType == 'Child';
+
     return Scaffold(
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(22),
-          children: [
-            const SizedBox(height: 18),
-            Container(
-              height: 86,
-              width: 86,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE9EFFB),
-                borderRadius: BorderRadius.circular(26),
-              ),
-              child: const Icon(
-                Icons.menu_book_rounded,
-                size: 48,
-                color: blue,
-              ),
-            ),
-            const SizedBox(height: 22),
-            const Text(
-              'Dyslexia Reading Tutor',
-              style: TextStyle(
-                fontSize: 29,
-                fontWeight: FontWeight.w900,
-                color: ink,
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'A patient reading coach that helps you learn one sound and one word at a time.',
-              style: TextStyle(
-                fontSize: 16,
-                color: Color(0xFF667085),
-                height: 1.45,
-              ),
-            ),
-            const SizedBox(height: 26),
-            const SectionTitle('Who is learning today?'),
-            const SizedBox(height: 10),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(
-                  value: 'Child',
-                  label: Text('Child'),
-                  icon: Icon(Icons.child_care),
-                ),
-                ButtonSegment(
-                  value: 'Adult',
-                  label: Text('Adult'),
-                  icon: Icon(Icons.person),
-                ),
-              ],
-              selected: {learnerType},
-              onSelectionChanged: (values) {
-                setState(() => learnerType = values.first);
-              },
-            ),
-            const SizedBox(height: 22),
-            const SectionTitle('Choose your tutor appearance'),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 10,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ChoiceChip(
-                  label: const Text('Cartoon teacher'),
-                  avatar: const Icon(Icons.smart_toy_outlined),
-                  selected: avatarStyle == 'Cartoon',
-                  onSelected: (_) {
-                    setState(() => avatarStyle = 'Cartoon');
+                const SizedBox(height: 12),
+                const Icon(
+                  Icons.menu_book_rounded,
+                  size: 76,
+                  color: Color(0xFF6558C9),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Dyslexia Reading Tutor',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF302A58),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'A little practice. A lot of progress.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+                const SizedBox(height: 28),
+                const Text(
+                  'Who is learning today?',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(
+                      value: 'Child',
+                      label: Text('Child'),
+                      icon: Icon(Icons.face_rounded),
+                    ),
+                    ButtonSegment(
+                      value: 'Adult',
+                      label: Text('Adult'),
+                      icon: Icon(Icons.person_rounded),
+                    ),
+                  ],
+                  selected: {learnerType},
+                  onSelectionChanged: (value) {
+                    setState(() => learnerType = value.first);
                   },
                 ),
-                ChoiceChip(
-                  label: const Text('Realistic teacher'),
-                  avatar: const Icon(Icons.face_retouching_natural),
-                  selected: avatarStyle == 'Realistic',
-                  onSelected: (_) {
-                    setState(() => avatarStyle = 'Realistic');
+                const SizedBox(height: 22),
+                const Text(
+                  'Tutor personality',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: avatarStyle,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'Friendly cartoon',
+                      child: Text('Friendly cartoon'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Calm reading coach',
+                      child: Text('Calm reading coach'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => avatarStyle = value);
+                    }
                   },
                 ),
-              ],
-            ),
-            const SizedBox(height: 22),
-            const SectionTitle('Choose a tutor voice style'),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: tutorVoice,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-              items: const [
-                DropdownMenuItem(
-                  value: 'Bright and energetic',
-                  child: Text('Bright and energetic'),
+                const SizedBox(height: 18),
+                const Text(
+                  'Tutor voice style',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                DropdownMenuItem(
-                  value: 'Playful and enthusiastic',
-                  child: Text('Playful and enthusiastic'),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: tutorVoice,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'Bright and cheerful',
+                      child: Text('Bright and cheerful'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Calm and encouraging',
+                      child: Text('Calm and encouraging'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => tutorVoice = value);
+                    }
+                  },
                 ),
-                DropdownMenuItem(
-                  value: 'Calm and gentle',
-                  child: Text('Calm and gentle'),
-                ),
-                DropdownMenuItem(
-                  value: 'Mature and conversational',
-                  child: Text('Mature and conversational'),
-                ),
-              ],
-              onChanged: (value) {
-                setState(() => tutorVoice = value ?? tutorVoice);
-              },
-            ),
-            const SizedBox(height: 26),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(56),
-                backgroundColor: ink,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => LessonScreen(
-                      learnerType: learnerType,
-                      avatarStyle: avatarStyle,
-                      tutorVoice: tutorVoice,
+                const SizedBox(height: 24),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      isChild
+                          ? 'We will learn one little word at a time. You can listen, try, and celebrate every effort!'
+                          : 'Practice at your own pace with spoken word practice and supportive guidance. No pressure and no timers.',
+                      style: const TextStyle(fontSize: 16, height: 1.5),
                     ),
                   ),
-                );
-              },
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text(
-                'Meet my reading tutor',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
                 ),
-              ),
+                const SizedBox(height: 22),
+                FilledButton.icon(
+                  onPressed: _start,
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text('Let’s start learning!'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(56),
+                    textStyle: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Reading Lounge replies are currently built-in responses, not live AI chat.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 14),
-            const Text(
-              'Practice with voice guidance, interactive sound lessons, and rewards. Live AI conversation and phoneme-level speech assessment are not connected yet.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: Color(0xFF7A8494),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
-
-class LessonWord {
-  final String word;
-  final String focus;
-  final String hint;
-
-  const LessonWord(this.word, this.focus, this.hint);
-}
-
-const List<LessonWord> wordBank = [
-  LessonWord('cat', 'short a', 'Listen for the middle vowel sound.'),
-  LessonWord('map', 'short a', 'Say each sound, then blend them smoothly.'),
-  LessonWord('sun', 'short u', 'Keep the vowel short and clear.'),
-  LessonWord('bed', 'short e', 'Notice the middle vowel sound.'),
-  LessonWord('sit', 'short i', 'Listen carefully to the vowel.'),
-  LessonWord('hop', 'short o', 'Keep the vowel sound brief.'),
-  LessonWord('lip', 'short i', 'Touch each sound, then blend.'),
-  LessonWord('mug', 'short u', 'Say the first, middle, and final sounds.'),
-  LessonWord('pet', 'short e', 'Listen for the vowel in the middle.'),
-  LessonWord('dot', 'short o', 'Blend all three sounds together.'),
-];
-
 class LessonScreen extends StatefulWidget {
   final String learnerType;
   final String avatarStyle;
@@ -268,16 +262,11 @@ class LessonScreen extends StatefulWidget {
 }
 
 class _LessonScreenState extends State<LessonScreen> {
+  final stt.SpeechToText lessonSpeech = stt.SpeechToText();
+  final FlutterTts lessonTts = FlutterTts();
   final Random random = Random();
-
-  List<LessonWord> queue = [];
-  LessonWord? current;
-
-  String tutorMessage = '';
-  String status = 'start';
-  String recognizedWords = '';
-  String speechProblem = '';
-  String rewardMessage = '';
+  final TextEditingController emergencyController =
+      TextEditingController();
 
   int stars = 0;
   int independentReads = 0;
@@ -285,130 +274,97 @@ class _LessonScreenState extends State<LessonScreen> {
   int wordsPracticed = 0;
   int currentStreak = 0;
 
+  int wordIndex = 0;
   int guidedStep = 0;
 
-  bool showSoundBreakdown = false;
-  bool speechAvailable = false;
-  bool lessonVoiceReady = false;
+  bool progressLoaded = false;
   bool isListening = false;
-  bool lessonSessionHandled = true;
+  bool speechAvailable = false;
   bool showEmergencyTyping = false;
   bool wordRewarded = false;
-  bool guidedMode = false;
-  bool awaitingIndependentConfirmation = false;
-  bool showCelebration = false;
+  bool lessonSessionHandled = false;
+  bool isSpeaking = false;
+  bool guidedPracticeStarted = false;
 
-  Timer? lessonEvaluationTimer;
+  String recognizedWords = '';
+  String statusMessage = 'Tap the microphone when you are ready.';
+  String tutorMessage = 'Ready to practice a word? Let’s do it!';
+  String rewardMessage = '';
+  String emergencyText = '';
 
-  final stt.SpeechToText lessonSpeech = stt.SpeechToText();
-  final FlutterTts lessonTts = FlutterTts();
+  Timer? evaluationTimer;
 
-  final TextEditingController emergencyController =
-      TextEditingController();
+  WordCard get currentWord => wordBank[wordIndex];
 
   bool get isChild => widget.learnerType == 'Child';
-
-  List<String> get sounds => (current?.word ?? '').split('');
 
   @override
   void initState() {
     super.initState();
-    _loadProgress();
-    _configureLessonVoice();
-    _newWord(first: true);
+    _initializeLesson();
   }
-    Future<void> _loadProgress() async {
-    final prefs = await SharedPreferences.getInstance();
+
+  Future<void> _initializeLesson() async {
+    await _loadProgress();
+    if (!mounted) return;
+
+    await _initializeSpeech();
+    await _configureVoice();
 
     if (!mounted) return;
 
     setState(() {
-      stars = prefs.getInt('stars') ?? 0;
-      independentReads = prefs.getInt('independentReads') ?? 0;
-      supportedAttempts = prefs.getInt('supportedAttempts') ?? 0;
-      wordsPracticed = prefs.getInt('wordsPracticed') ?? 0;
+      statusMessage = speechAvailable
+          ? 'Your microphone is ready. Tap it and read the word aloud.'
+          : 'Speech recognition is unavailable. Check microphone permission.';
+      if (!speechAvailable) showEmergencyTyping = true;
+    });
+
+    _speak(
+      isChild
+          ? 'Welcome back, superstar reader! Let’s practice a word together.'
+          : 'Welcome. Let’s work through a reading exercise at your own pace.',
+    );
+  }
+
+  Future<void> _loadProgress() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+
+    setState(() {
+      stars = prefs.getInt('reading_stars') ?? 0;
+      independentReads = prefs.getInt('independent_reads') ?? 0;
+      supportedAttempts = prefs.getInt('supported_attempts') ?? 0;
+      wordsPracticed = prefs.getInt('words_practiced') ?? 0;
+      progressLoaded = true;
     });
   }
 
   Future<void> _saveProgress() async {
     final prefs = await SharedPreferences.getInstance();
-
-    await prefs.setInt('stars', stars);
-    await prefs.setInt('independentReads', independentReads);
-    await prefs.setInt('supportedAttempts', supportedAttempts);
-    await prefs.setInt('wordsPracticed', wordsPracticed);
-  }
-
-  Future<void> _configureLessonVoice() async {
-    try {
-      await lessonTts.setLanguage('en-US');
-      await lessonTts.setSpeechRate(isChild ? 0.43 : 0.48);
-      await lessonTts.setPitch(isChild ? 1.12 : 1.0);
-      await lessonTts.awaitSpeakCompletion(true);
-
-      if (mounted) {
-        setState(() => lessonVoiceReady = true);
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => lessonVoiceReady = false);
-      }
-    }
-  }
-
-  Future<void> _speak(String message) async {
-    try {
-      await lessonTts.stop();
-      await lessonTts.speak(message);
-    } catch (_) {
-      // The on-screen instructions remain available if speech fails.
-    }
-  }
-
-  void _newWord({bool first = false}) {
-    lessonEvaluationTimer?.cancel();
-
-    if (queue.isEmpty) {
-      queue = List<LessonWord>.from(wordBank)..shuffle(random);
-    }
-
-    final next = queue.removeAt(0);
-
-    setState(() {
-      current = next;
-      status = 'start';
-      recognizedWords = '';
-      speechProblem = '';
-      rewardMessage = '';
-      guidedStep = 0;
-
-      showSoundBreakdown = false;
-      guidedMode = false;
-      awaitingIndependentConfirmation = false;
-      showCelebration = false;
-      wordRewarded = false;
-      showEmergencyTyping = false;
-
-      lessonSessionHandled = true;
-      isListening = false;
-
-      tutorMessage = first
-          ? 'Welcome! Let’s warm up with a word. You can take your time. I’m here to help!'
-          : 'Here comes your next word! Let’s see what sounds you notice.';
-    });
-
-    _speak(tutorMessage);
+    await prefs.setInt('reading_stars', stars);
+    await prefs.setInt('independent_reads', independentReads);
+    await prefs.setInt('supported_attempts', supportedAttempts);
+    await prefs.setInt('words_practiced', wordsPracticed);
   }
 
   Future<void> _initializeSpeech() async {
     try {
       speechAvailable = await lessonSpeech.initialize(
-        onStatus: (value) {
+        onStatus: (status) {
           if (!mounted) return;
 
-          if (value == 'notListening' && isListening) {
-            setState(() => isListening = false);
-            _scheduleLessonEvaluation();
+          if (status == 'notListening' && isListening) {
+            setState(() {
+              isListening = false;
+              statusMessage = recognizedWords.isEmpty
+                  ? 'I stopped listening. You can try again.'
+                  : 'I heard you. Checking your word...';
+            });
+
+            if (recognizedWords.isNotEmpty) {
+              _scheduleLessonEvaluation();
+            }
           }
         },
         onError: (error) {
@@ -416,53 +372,73 @@ class _LessonScreenState extends State<LessonScreen> {
 
           setState(() {
             isListening = false;
-            speechProblem = 'I had trouble hearing that. Let’s try again.';
+            statusMessage = 'Microphone issue: ${error.errorMsg}';
+            if (recognizedWords.isEmpty) {
+              showEmergencyTyping = true;
+            }
           });
 
-          if (recognizedWords.trim().isNotEmpty) {
+          if (recognizedWords.isNotEmpty) {
             _scheduleLessonEvaluation();
           }
         },
-        debugLogging: false,
       );
-
-      if (mounted) {
-        setState(() {
-          if (!speechAvailable) {
-            speechProblem =
-                'Speech recognition is not available right now. You can try again or use the backup option.';
-          }
-        });
-      }
     } catch (_) {
       speechAvailable = false;
+    }
 
-      if (mounted) {
-        setState(() {
-          speechProblem =
-              'The microphone could not start. Please check microphone permission.';
-        });
-      }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _configureVoice() async {
+    try {
+      await lessonTts.setLanguage('en-US');
+      await lessonTts.setSpeechRate(isChild ? 0.43 : 0.48);
+      await lessonTts.setPitch(isChild ? 1.12 : 1.0);
+      await lessonTts.setVolume(1.0);
+      await lessonTts.awaitSpeakCompletion(true);
+    } catch (_) {
+      // Written instructions remain available if speech setup fails.
     }
   }
 
+  Future<void> _speak(String message) async {
+    try {
+      await lessonTts.stop();
+      if (!mounted) return;
+
+      setState(() => isSpeaking = true);
+      await lessonTts.speak(message);
+    } catch (_) {
+      // Keep the on-screen instructions available if speech fails.
+    } finally {
+      if (mounted) setState(() => isSpeaking = false);
+    }
+  }
+
+  Future<void> _stopSpeaking() async {
+    await lessonTts.stop();
+    if (mounted) setState(() => isSpeaking = false);
+  }
+
   Future<void> _toggleLessonMicrophone() async {
+    if (!progressLoaded || wordRewarded) return;
+
     if (isListening) {
       await lessonSpeech.stop();
 
-      if (!mounted) return;
-
-      setState(() => isListening = false);
-
-      if (recognizedWords.trim().isNotEmpty) {
-        _scheduleLessonEvaluation();
-      } else {
+      if (mounted) {
         setState(() {
-          speechProblem =
-              'I didn’t catch anything that time. Tap the microphone and try again.';
+          isListening = false;
+          statusMessage = recognizedWords.isEmpty
+              ? 'Listening stopped. Tap the microphone to try again.'
+              : 'Checking what I heard...';
         });
       }
 
+      if (recognizedWords.isNotEmpty) {
+        _scheduleLessonEvaluation();
+      }
       return;
     }
 
@@ -471,31 +447,42 @@ class _LessonScreenState extends State<LessonScreen> {
     }
 
     if (!speechAvailable) {
-      if (!mounted) return;
-
       setState(() {
-        speechProblem =
-            'Your microphone is not ready. Check permission or try again.';
         showEmergencyTyping = true;
+        statusMessage =
+            'Speech recognition is unavailable. Check microphone permission or use the backup option.';
       });
-
       return;
     }
 
-    lessonEvaluationTimer?.cancel();
+    evaluationTimer?.cancel();
+    lessonSessionHandled = false;
+    recognizedWords = '';
 
     setState(() {
-      recognizedWords = '';
-      speechProblem = '';
-      status = 'listening';
-      isListening = true;
-      lessonSessionHandled = false;
       showEmergencyTyping = false;
+      isListening = true;
+      statusMessage = 'Listening... read the whole word aloud.';
     });
 
     try {
       await lessonSpeech.listen(
-        onResult: _onLessonSpeechResult,
+        onResult: (result) {
+          if (!mounted) return;
+
+          recognizedWords = result.recognizedWords;
+
+          setState(() {
+            statusMessage = recognizedWords.isEmpty
+                ? 'Listening...'
+                : 'I heard: "$recognizedWords"';
+          });
+
+          if (result.finalResult) {
+            setState(() => isListening = false);
+            _scheduleLessonEvaluation();
+          }
+        },
         listenFor: const Duration(seconds: 90),
         pauseFor: const Duration(seconds: 15),
         partialResults: true,
@@ -507,723 +494,781 @@ class _LessonScreenState extends State<LessonScreen> {
 
       setState(() {
         isListening = false;
-        speechProblem =
-            'The microphone stopped unexpectedly. Please try again.';
         showEmergencyTyping = true;
+        statusMessage =
+            'I could not start the microphone. Check permission or use the backup option.';
       });
-    }
-  }
-
-  void _onLessonSpeechResult(stt_result.SpeechRecognitionResult result) {
-    if (!mounted) return;
-
-    setState(() {
-      recognizedWords = result.recognizedWords;
-    });
-
-    if (result.finalResult) {
-      setState(() => isListening = false);
-      _scheduleLessonEvaluation();
     }
   }
 
   void _scheduleLessonEvaluation() {
-    lessonEvaluationTimer?.cancel();
+    evaluationTimer?.cancel();
 
-    if (recognizedWords.trim().isEmpty || lessonSessionHandled) {
-      return;
-    }
-
-    lessonEvaluationTimer = Timer(
-      const Duration(milliseconds: 700),
-      _evaluateLessonSpeech,
+    evaluationTimer = Timer(
+      const Duration(milliseconds: 900),
+      () {
+        if (mounted) _evaluateLessonSpeech();
+      },
     );
   }
 
   void _evaluateLessonSpeech() {
-    if (!mounted || lessonSessionHandled) return;
+    if (lessonSessionHandled || wordRewarded) return;
 
     lessonSessionHandled = true;
 
-    final heard = recognizedWords.toLowerCase().trim();
-    final target = current?.word.toLowerCase() ?? '';
+    final heard = recognizedWords.toLowerCase().replaceAll(
+          RegExp(r'[^a-z ]'),
+          '',
+        );
 
-    final words = heard
-        .replaceAll(RegExp(r'[^a-z\s]'), '')
-        .split(RegExp(r'\s+'))
-        .where((word) => word.isNotEmpty)
-        .toList();
+    final target = currentWord.word.toLowerCase();
+    final heardList = heard.split(RegExp(r'\s+'));
 
-    final heardTarget = words.contains(target);
-
-    setState(() {
-      isListening = false;
-      wordsPracticed++;
-      status = 'evaluated';
-    });
-
-    _saveProgress();
-
-    if (heardTarget) {
+    if (heardList.contains(target)) {
       setState(() {
-        awaitingIndependentConfirmation = true;
-        tutorMessage =
-            'I heard "$target"! That’s exciting. Did you read it all by yourself, or would you like me to help you work through the sounds?';
+        statusMessage = 'I heard the word "$target"!';
+        tutorMessage = isChild
+            ? 'You said $target! That is worth celebrating!'
+            : 'I recognized the target word, $target. Let’s record your attempt.';
       });
 
-      _speak(tutorMessage);
+      _askForSelfConfirmation();
     } else {
       setState(() {
-        speechProblem = '';
-        tutorMessage =
-            'Thanks for giving that a try! I heard "$heard". Let’s look at the sounds together. There’s no rush.';
+        statusMessage = heard.isEmpty
+            ? 'I did not catch that. Try again when you are ready.'
+            : 'I heard "$heard". Let’s practice the word together.';
+
+        tutorMessage = isChild
+            ? 'That’s okay! Reading takes practice. Let’s break it into sounds.'
+            : 'That attempt was not clearly recognized. We can try again or use the sound guide.';
       });
 
       _speak(tutorMessage);
     }
   }
 
-  void _confirmIndependentReading() {
+  Future<void> _askForSelfConfirmation() async {
+    final answer = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('How did you read it?'),
+          content: const Text(
+            'Did you work out the word on your own, or did you use the sound guide?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('I used the sound guide'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('I read it on my own'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted || answer == null) {
+      if (mounted) {
+        setState(() {
+          lessonSessionHandled = false;
+          statusMessage = 'Choose how you would like to continue.';
+        });
+      }
+      return;
+    }
+
+    _awardWord(independent: answer);
+  }
+
+  Future<void> _awardWord({required bool independent}) async {
     if (wordRewarded) return;
 
+    final List<String> praise = independent
+        ? (isChild
+            ? [
+                'Fantastic reading! You figured that one out!',
+                'Word wizard! You read it on your own!',
+                'Look at you go! That was independent reading!',
+                'Brilliant effort! Your reading brain is growing!',
+              ]
+            : [
+                'Well done. You decoded that word independently.',
+                'Strong work. You read that word without the guide.',
+                'Good progress. That was an independent reading attempt.',
+              ])
+        : (isChild
+            ? [
+                'Great effort! Practicing the sounds is how readers grow!',
+                'You stuck with it! That deserves a star!',
+                'Nice work using your reading tools!',
+              ]
+            : [
+                'Good work using the sound guide.',
+                'You completed a supported practice attempt.',
+                'That is useful practice. Keep building on it.',
+              ]);
+
     setState(() {
-      independentReads++;
-      currentStreak++;
-      stars += 3;
       wordRewarded = true;
-      awaitingIndependentConfirmation = false;
-      showCelebration = true;
-      status = 'complete';
+      wordsPracticed++;
 
-      rewardMessage = isChild
-          ? 'THREE STARS! You read that word independently! You are building a brilliant reading brain!'
-          : 'Three stars earned. You read that word independently. That is real progress.';
-      tutorMessage = rewardMessage;
+      rewardMessage = praise[random.nextInt(praise.length)];
+
+      if (independent) {
+        independentReads++;
+        currentStreak++;
+        stars += 3;
+
+        if (currentStreak % 3 == 0) {
+          stars += 2;
+          rewardMessage += isChild
+              ? ' Three independent reads in a row! Bonus stars!'
+              : ' Three independent reads in a row. A bonus has been added.';
+        }
+      } else {
+        supportedAttempts++;
+        currentStreak = 0;
+        stars += 1;
+      }
+
+      statusMessage = rewardMessage;
     });
 
-    _saveProgress();
-    _speak(rewardMessage);
+    await _saveProgress();
+    await _speak(rewardMessage);
   }
 
-  void _startGuidedHelp() {
+  Future<void> _startGuidedHelp() async {
     if (wordRewarded) return;
 
     setState(() {
-      guidedMode = true;
-      awaitingIndependentConfirmation = false;
       guidedStep = 0;
-      showCelebration = false;
-      status = 'guided';
-      tutorMessage =
-          'You got it. We’ll take this word apart together. First, let’s look at the beginning sound.';
+      guidedPracticeStarted = true;
+      tutorMessage = 'Let’s take this word one sound at a time.';
+      statusMessage = 'Sound 1 of ${currentWord.sounds.length}';
+      lessonSessionHandled = true;
     });
 
-    _speak(tutorMessage);
-    _speakCurrentSound();
+    await _speak(tutorMessage);
+    if (!mounted) return;
+
+    await _speakCurrentSound();
   }
 
-  String _soundDescription(String letter) {
+  String _soundHint(String letter) {
     switch (letter.toLowerCase()) {
       case 'a':
-        return 'the short a sound, like the middle sound in apple';
+        return 'Short a, as in apple.';
       case 'e':
-        return 'the short e sound, like the middle sound in egg';
+        return 'Short e, as in egg.';
       case 'i':
-        return 'the short i sound, like the middle sound in insect';
+        return 'Short i, as in insect.';
       case 'o':
-        return 'the short o sound, like the middle sound in octopus';
+        return 'Short o, as in octopus.';
       case 'u':
-        return 'the short u sound, like the middle sound in umbrella';
+        return 'Short u, as in umbrella.';
       case 'c':
-        return 'the k sound, like the beginning of cat';
+        return 'The c in cat makes a k sound.';
       case 'g':
-        return 'the hard g sound, like the beginning of goat';
-      case 'm':
-        return 'mmm, the sound you hear at the beginning of moon';
+        return 'The g in this word makes a hard g sound.';
       case 's':
-        return 'sss, the sound you hear at the beginning of sun';
+        return 'The s sound is a quiet snake sound.';
+      case 'm':
+        return 'The m sound starts with your lips together.';
       case 't':
-        return 't, the quick sound at the beginning of top';
+        return 'The t sound is a quick tap sound.';
       case 'p':
-        return 'p, the quick sound at the beginning of pig';
+        return 'The p sound is a little puff of air.';
       case 'b':
-        return 'b, the sound at the beginning of ball';
+        return 'The b sound starts with your lips together.';
       case 'd':
-        return 'd, the sound at the beginning of dog';
+        return 'The d sound is a quick tongue tap.';
       case 'h':
-        return 'h, the breathy sound at the beginning of hat';
-      case 'n':
-        return 'nnn, the sound at the beginning of nest';
+        return 'The h sound is a gentle breath.';
       case 'l':
-        return 'lll, the sound at the beginning of leaf';
-      case 'r':
-        return 'rrr, the sound at the beginning of rabbit';
+        return 'The l sound starts with your tongue near your top teeth.';
+      case 'n':
+        return 'The n sound is made with your tongue near your top teeth.';
       default:
-        return 'the sound this letter makes';
+        return 'Listen to the sound and try saying it.';
     }
   }
 
   Future<void> _speakCurrentSound() async {
-    if (current == null || guidedStep >= sounds.length) return;
+    if (!mounted || wordRewarded) return;
 
-    final letter = sounds[guidedStep];
-    final description = _soundDescription(letter);
-
-    final message =
-        'Look at this letter: $letter. It makes $description. Listen: $letter. Now you try saying that sound out loud.';
-
-    setState(() {
-      tutorMessage = message;
-    });
-
-    await _speak(message);
-  }
-
-  void _repeatCurrentSound() {
-    _speakCurrentSound();
-  }
-
-  void _advanceGuidedStep() {
-    if (current == null) return;
-
-    if (guidedStep < sounds.length - 1) {
+    if (guidedStep >= currentWord.sounds.length) {
       setState(() {
-        guidedStep++;
-        tutorMessage =
-            'Great effort! Now let’s look at the next sound. Take your time.';
+        tutorMessage = 'Now blend the sounds together to make the whole word.';
+        statusMessage = 'Blend: ${currentWord.sounds.join('  ')}';
       });
 
-      _speak(tutorMessage);
-      _speakCurrentSound();
-    } else {
-      setState(() {
-        guidedStep = sounds.length;
-        tutorMessage =
-            'You worked through every sound! Now let’s slide them together. Listen: ${sounds.join(' ... ')}. Now blend those sounds into one word: ${current!.word}.';
-      });
-
-      _speak(tutorMessage);
-    }
-  }
-
-  void _completeGuidedWord() {
-    if (wordRewarded || current == null) return;
-
-    setState(() {
-      supportedAttempts++;
-      currentStreak = 0;
-      stars += 1;
-      wordRewarded = true;
-      guidedMode = false;
-      showCelebration = true;
-      status = 'complete';
-
-      rewardMessage = isChild
-          ? 'ONE STAR! You worked through every sound and blended the word. That took determination!'
-          : 'One star earned for completing the word with guided support. Every step counts.';
-      tutorMessage = rewardMessage;
-    });
-
-    _saveProgress();
-    _speak(rewardMessage);
-  }
-
-  void _submitEmergencyTyping() {
-    final typed = emergencyController.text.trim();
-
-    if (typed.isEmpty || current == null) return;
-
-    setState(() {
-      recognizedWords = typed;
-      showEmergencyTyping = false;
-      speechProblem = '';
-      lessonSessionHandled = false;
-    });
-
-    emergencyController.clear();
-    _evaluateLessonSpeech();
-  }
-
-  void _goToNextWord() {
-    if (!wordRewarded) {
-      _startGuidedHelp();
+      await _speak(
+        'Now blend the sounds together. ${currentWord.sounds.join(', ')}. '
+        'What word do they make?',
+      );
       return;
     }
 
-    _newWord();
+    final letter = currentWord.sounds[guidedStep];
+    final hint = _soundHint(letter);
+
+    setState(() {
+      tutorMessage = hint;
+      statusMessage =
+          'Sound ${guidedStep + 1} of ${currentWord.sounds.length}: $letter';
+    });
+
+    await _speak('$letter. $hint');
+  }
+
+  Future<void> _advanceGuidedStep() async {
+    if (wordRewarded) return;
+
+    if (guidedStep < currentWord.sounds.length) {
+      setState(() => guidedStep++);
+      await _speakCurrentSound();
+      return;
+    }
+
+    setState(() {
+      tutorMessage = 'You practiced the sounds and blending. How did it go?';
+      statusMessage = 'You completed the guided practice.';
+    });
+
+    final answer = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('How did that feel?'),
+          content: const Text(
+            'Did you try blending the sounds into the whole word?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('I want to practice again'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Yes, I tried it!'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted) return;
+
+    if (answer == true) {
+      await _awardWord(independent: false);
+    } else {
+      setState(() {
+        guidedStep = 0;
+        statusMessage = 'No rush. Let’s try those sounds again.';
+      });
+
+      await _speak('No rush. We can practice those sounds again.');
+    }
+  }
+
+  Future<void> _submitEmergencyTyping() async {
+    final typed = emergencyController.text.trim();
+    if (typed.isEmpty) return;
+
+    recognizedWords = typed;
+    lessonSessionHandled = false;
+    FocusScope.of(context).unfocus();
+
+    setState(() {
+      emergencyText = typed;
+      statusMessage = 'Checking your backup response...';
+    });
+
+    _evaluateLessonSpeech();
+  }
+
+  Future<void> _newWord() async {
+    evaluationTimer?.cancel();
+
+    if (isListening) {
+      await lessonSpeech.stop();
+    }
+
+    setState(() {
+      wordIndex = (wordIndex + 1) % wordBank.length;
+      guidedStep = 0;
+      guidedPracticeStarted = false;
+      isListening = false;
+      wordRewarded = false;
+      lessonSessionHandled = false;
+      recognizedWords = '';
+      emergencyText = '';
+      emergencyController.clear();
+      rewardMessage = '';
+      showEmergencyTyping = !speechAvailable;
+      tutorMessage = 'Let’s meet a new word!';
+      statusMessage = 'Tap the microphone and read the new word aloud.';
+    });
+
+    await _speak('Your next word is ${currentWord.word}.');
+  }
+
+  Future<void> _openReadingLounge() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TutorChatScreen(
+          learnerType: widget.learnerType,
+          tutorVoice: widget.tutorVoice,
+        ),
+      ),
+    );
   }
 
   @override
   void dispose() {
-    lessonEvaluationTimer?.cancel();
+    evaluationTimer?.cancel();
     lessonSpeech.stop();
     lessonTts.stop();
     emergencyController.dispose();
     super.dispose();
   }
-
-  @override
+    @override
   Widget build(BuildContext context) {
-    final word = current?.word ?? 'cat';
+    final word = currentWord;
+    final soundPracticeFinished =
+        guidedStep >= word.sounds.length;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reading Lesson'),
-        backgroundColor: cream,
+        title: const Text('Reading Practice'),
         actions: [
           IconButton(
-            tooltip: 'Reading lounge',
-            icon: const Icon(Icons.forum_outlined),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => TutorChatScreen(
-                    learnerType: widget.learnerType,
-                    tutorVoice: widget.tutorVoice,
-                  ),
-                ),
-              );
-            },
+            tooltip: 'Reading Lounge',
+            onPressed: _openReadingLounge,
+            icon: const Icon(Icons.forum_rounded),
           ),
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: _StatLine(
-                    icon: Icons.star_rounded,
-                    label: '$stars stars',
-                    color: gold,
-                  ),
-                ),
-                Expanded(
-                  child: _StatLine(
-                    icon: Icons.local_fire_department_rounded,
-                    label: '$currentStreak streak',
-                    color: coral,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SectionTitle('Today’s reading mission'),
-                    const SizedBox(height: 8),
-                    Text(
-                      isChild
-                          ? 'Let’s be sound detectives! We’ll find each sound and put them together.'
-                          : 'Work through each sound at your own pace. You can practice independently or use guided support.',
-                      style: const TextStyle(fontSize: 15),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        Chip(
-                          avatar: const Icon(
-                            Icons.check_circle_outline,
-                            size: 18,
-                          ),
-                          label: Text('$independentReads independent'),
-                        ),
-                        Chip(
-                          avatar: const Icon(
-                            Icons.lightbulb_outline,
-                            size: 18,
-                          ),
-                          label: Text('$supportedAttempts guided'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Text(
-                      'YOUR WORD',
-                      style: TextStyle(
-                        color: Colors.blueGrey.shade500,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        for (int i = 0; i < word.length; i++)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 5),
-                            child: Text(
-                              word[i].toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 58,
-                                fontWeight: FontWeight.w900,
-                                color: 'aeiou'.contains(word[i])
-                                    ? blue
-                                    : coral,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      current?.focus ?? '',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        color: Color(0xFF667085),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      current?.hint ?? '',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const CircleAvatar(
-                          backgroundColor: Color(0xFFE9EFFB),
-                          child: Icon(
-                            Icons.record_voice_over_rounded,
-                            color: blue,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            widget.avatarStyle == 'Cartoon'
-                                ? 'Your reading buddy'
-                                : 'Your reading coach',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 17,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: 'Hear tutor again',
-                          onPressed: () => _speak(tutorMessage),
-                          icon: const Icon(Icons.volume_up_rounded),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      tutorMessage,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        height: 1.45,
-                      ),
-                    ),
-                    if (recognizedWords.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        'I heard: "$recognizedWords"',
-                        style: const TextStyle(
-                          color: Color(0xFF667085),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            if (awaitingIndependentConfirmation) ...[
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               Card(
-                color: const Color(0xFFEAF6EF),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      const Text(
-                        'How did you read it?',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      Row(
+                        mainAxisAlignment:
+                            MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Your reading progress',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.star_rounded,
+                                color: Colors.amber,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$stars',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: mint,
-                            minimumSize: const Size.fromHeight(52),
-                          ),
-                          onPressed: _confirmIndependentReading,
-                          icon: const Icon(Icons.star_rounded),
-                          label: const Text('I read it by myself!'),
-                        ),
+                      _StatLine(
+                        label: 'Words practiced',
+                        value: wordsPracticed,
+                      ),
+                      _StatLine(
+                        label: 'Independent reads',
+                        value: independentReads,
+                      ),
+                      _StatLine(
+                        label: 'Guided practices',
+                        value: supportedAttempts,
                       ),
                       const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: _startGuidedHelp,
-                          icon: const Icon(Icons.lightbulb_outline),
-                          label: const Text('Help me with the sounds'),
+                      Text(
+                        'Stars reflect your practice choices and self-reported reading, not an automatic reading test.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-            ] else if (guidedMode) ...[
-              Card(
-                color: const Color(0xFFFFF6E4),
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    children: [
-                      Text(
-                        guidedStep < sounds.length
-                            ? 'Sound ${guidedStep + 1} of ${sounds.length}'
-                            : 'Now blend the sounds!',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      if (guidedStep < sounds.length) ...[
-                        Text(
-                          sounds[guidedStep].toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 64,
-                            fontWeight: FontWeight.w900,
-                            color: 'aeiou'.contains(sounds[guidedStep])
-                                ? blue
-                                : coral,
-                          ),
-                        ),
-                        Text(
-                          _soundDescription(sounds[guidedStep]),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 15),
-                        ),
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: _repeatCurrentSound,
-                            icon: const Icon(Icons.volume_up),
-                            label: const Text('Hear this sound again'),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: _advanceGuidedStep,
-                            icon: const Icon(Icons.arrow_forward),
-                            label: const Text('I tried it! Next sound'),
-                          ),
-                        ),
-                      ] else ...[
-                        Text(
-                          sounds.join('  •  '),
-                          style: const TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                            color: blue,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Slide the sounds together to say "$word".',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: _completeGuidedWord,
-                            icon: const Icon(Icons.auto_awesome),
-                            label: const Text('I blended the word!'),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+              const SizedBox(height: 18),
+              Text(
+                isChild
+                    ? 'Today’s word adventure!'
+                    : 'Today’s practice word',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF302A58),
                 ),
               ),
-            ] else if (showCelebration) ...[
+              const SizedBox(height: 12),
               Card(
-                color: const Color(0xFFFFF4D6),
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 24,
+                  ),
                   child: Column(
                     children: [
-                      const Text(
-                        '🎉 ⭐ 🎉',
-                        style: TextStyle(fontSize: 36),
-                      ),
-                      const SizedBox(height: 8),
                       Text(
-                        rewardMessage,
+                        word.word,
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          height: 1.4,
+                          fontSize: 58,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 5,
+                          color: Color(0xFF302A58),
                         ),
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        wordRewarded
-                            ? 'Your star total: $stars'
-                            : '',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          color: ink,
+                        word.meaning,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                      const SizedBox(height: 18),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 12,
+                        children: List.generate(
+                          word.sounds.length,
+                          (index) {
+                            final sound = word.sounds[index];
+                            final isVowel = 'aeiou'.contains(sound);
+                            final isCurrent =
+                                guidedPracticeStarted &&
+                                guidedStep == index &&
+                                !wordRewarded;
+
+                            return Container(
+                              width: 58,
+                              height: 64,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: isCurrent
+                                    ? Colors.amber.shade100
+                                    : isVowel
+                                        ? Colors.lightBlue.shade100
+                                        : Colors.red.shade100,
+                                borderRadius:
+                                    BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: isCurrent
+                                      ? Colors.orange
+                                      : Colors.transparent,
+                                  width: 2,
+                                ),
+                              ),
+                              child: Text(
+                                sound,
+                                style: const TextStyle(
+                                  fontSize: 30,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: _goToNextWord,
-                          icon: const Icon(Icons.arrow_forward),
-                          label: const Text('Next word!'),
+                      Text(
+                        'Consonants are red. Vowels are blue.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-            ] else ...[
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(58),
-                    backgroundColor: isListening ? coral : blue,
-                  ),
-                  onPressed: _toggleLessonMicrophone,
-                  icon: Icon(
-                    isListening ? Icons.stop_circle : Icons.mic,
-                  ),
-                  label: Text(
-                    isListening
-                        ? 'Tap to stop listening'
-                        : 'Tap to read the word aloud',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+              const SizedBox(height: 16),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'Your tutor says:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 17,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        tutorMessage,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          height: 1.4,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: isSpeaking
+                            ? _stopSpeaking
+                            : () => _speak(tutorMessage),
+                        icon: Icon(
+                          isSpeaking
+                              ? Icons.stop_rounded
+                              : Icons.volume_up_rounded,
+                        ),
+                        label: Text(
+                          isSpeaking
+                              ? 'Stop tutor voice'
+                              : 'Hear that again',
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+              ),
+              const SizedBox(height: 14),
+              FilledButton.icon(
+                onPressed: progressLoaded && !wordRewarded
+                    ? _toggleLessonMicrophone
+                    : null,
+                icon: Icon(
+                  isListening
+                      ? Icons.stop_circle
+                      : Icons.mic_rounded,
+                ),
+                label: Text(
+                  isListening
+                      ? 'Stop listening'
+                      : 'Tap to read aloud',
+                ),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(58),
+                  textStyle: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                statusMessage,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14),
               ),
               if (isListening) ...[
-                const SizedBox(height: 10),
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.graphic_eq, color: coral),
-                    SizedBox(width: 8),
-                    Text('Listening... Take your time.'),
-                  ],
-                ),
-              ],
-              if (speechProblem.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  speechProblem,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: coral),
-                ),
-              ],
-              if (showEmergencyTyping) ...[
-                const SizedBox(height: 12),
-                TextField(
-                  controller: emergencyController,
-                  decoration: const InputDecoration(
-                    labelText: 'Backup answer',
-                    hintText: 'Type the word only if voice is unavailable',
-                    border: OutlineInputBorder(),
-                  ),
-                  onSubmitted: (_) => _submitEmergencyTyping(),
+                const SizedBox(height: 8),
+                const Center(
+                  child: CircularProgressIndicator(),
                 ),
                 const SizedBox(height: 8),
-                FilledButton(
-                  onPressed: _submitEmergencyTyping,
-                  child: const Text('Submit backup answer'),
+                const Text(
+                  'The microphone is listening. Tap Stop listening when you are finished.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12),
                 ),
               ],
-              const SizedBox(height: 12),
-              TextButton.icon(
-                onPressed: _startGuidedHelp,
-                icon: const Icon(Icons.lightbulb_outline),
-                label: const Text('I need help with this word'),
-              ),
-            ],
-            const SizedBox(height: 20),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SectionTitle('Your reading progress'),
-                    const SizedBox(height: 12),
-                    _StatLine(
-                      icon: Icons.menu_book_rounded,
-                      label: '$wordsPracticed practice attempts',
-                      color: blue,
+              if (showEmergencyTyping && !wordRewarded) ...[
+                const SizedBox(height: 18),
+                Card(
+                  color: Colors.orange.shade50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          'Microphone backup',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'This is only a backup if speech recognition is unavailable. You can retry the microphone after checking its permission.',
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: emergencyController,
+                          onChanged: (value) {
+                            emergencyText = value;
+                          },
+                          decoration: const InputDecoration(
+                            hintText: 'Type the word as a backup',
+                            border: OutlineInputBorder(),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        FilledButton.tonal(
+                          onPressed: _submitEmergencyTyping,
+                          child: const Text(
+                            'Submit backup response',
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            await _initializeSpeech();
+                            if (!mounted) return;
+
+                            setState(() {
+                              showEmergencyTyping =
+                                  !speechAvailable;
+                              statusMessage = speechAvailable
+                                  ? 'Microphone ready. Tap to try again.'
+                                  : 'Speech recognition is still unavailable.';
+                            });
+                          },
+                          child: const Text('Retry microphone'),
+                        ),
+                      ],
                     ),
-                    _StatLine(
-                      icon: Icons.emoji_events_outlined,
-                      label: '$independentReads independent reads',
-                      color: gold,
-                    ),
-                    _StatLine(
-                      icon: Icons.lightbulb_outline,
-                      label: '$supportedAttempts guided completions',
-                      color: mint,
-                    ),
-                  ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              OutlinedButton.icon(
+                onPressed: wordRewarded
+                    ? null
+                    : _startGuidedHelp,
+                icon: const Icon(
+                  Icons.lightbulb_outline_rounded,
+                ),
+                label: const Text('Help me sound it out'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(50),
                 ),
               ),
-            ),
-          ],
+              if (guidedPracticeStarted &&
+                  !wordRewarded) ...[
+                const SizedBox(height: 10),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          soundPracticeFinished
+                              ? 'Now blend the sounds!'
+                              : 'Sound ${guidedStep + 1} of ${word.sounds.length}',
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          soundPracticeFinished
+                              ? word.sounds.join('  +  ')
+                              : '${word.sounds[guidedStep]}  •  ${_soundHint(word.sounds[guidedStep])}',
+                          style: const TextStyle(fontSize: 18),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: _speakCurrentSound,
+                          icon: const Icon(
+                            Icons.volume_up_rounded,
+                          ),
+                          label: const Text(
+                            'Hear this sound again',
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        FilledButton(
+                          onPressed: _advanceGuidedStep,
+                          child: Text(
+                            soundPracticeFinished
+                                ? 'I tried blending the word!'
+                                : 'I tried it! Next sound',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              if (wordRewarded) ...[
+                const SizedBox(height: 12),
+                Card(
+                  color: Colors.amber.shade50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.celebration_rounded,
+                          size: 48,
+                          color: Colors.deepOrange,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          rewardMessage,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          onPressed: _newWord,
+                          icon: const Icon(
+                            Icons.arrow_forward_rounded,
+                          ),
+                          label: const Text('Try another word'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 18),
+              OutlinedButton.icon(
+                onPressed: _openReadingLounge,
+                icon: const Icon(Icons.forum_rounded),
+                label: const Text('Visit the Reading Lounge'),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
+
 class TutorChatScreen extends StatefulWidget {
   final String learnerType;
   final String tutorVoice;
@@ -1235,23 +1280,31 @@ class TutorChatScreen extends StatefulWidget {
   });
 
   @override
-  State<TutorChatScreen> createState() => _TutorChatScreenState();
+  State<TutorChatScreen> createState() =>
+      _TutorChatScreenState();
 }
 
 class _TutorChatScreenState extends State<TutorChatScreen> {
   final stt.SpeechToText chatSpeech = stt.SpeechToText();
   final FlutterTts chatTts = FlutterTts();
-  final TextEditingController backupController = TextEditingController();
+  final TextEditingController messageController =
+      TextEditingController();
 
-  final List<Map<String, String>> messages = [];
+  final List<Map<String, String>> messages = [
+    {
+      'speaker': 'Tutor',
+      'message':
+          'Welcome to the Reading Lounge! What would you like to talk about?',
+    },
+  ];
 
-  bool speechAvailable = false;
+  bool chatSpeechAvailable = false;
   bool isListening = false;
-  bool showBackupTyping = false;
-  bool voiceReady = false;
+  bool isSpeaking = false;
+  bool chatSessionHandled = false;
 
   String heardWords = '';
-  String speechProblem = '';
+  String statusMessage = 'Tap the microphone to talk.';
 
   bool get isChild => widget.learnerType == 'Child';
 
@@ -1266,37 +1319,14 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
       await chatTts.setLanguage('en-US');
       await chatTts.setSpeechRate(isChild ? 0.43 : 0.48);
       await chatTts.setPitch(isChild ? 1.12 : 1.0);
+      await chatTts.setVolume(1.0);
       await chatTts.awaitSpeakCompletion(true);
 
-      if (mounted) {
-        setState(() => voiceReady = true);
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => voiceReady = false);
-      }
-    }
-
-    await _initializeChatSpeech();
-
-    if (!mounted) return;
-
-    if (messages.isEmpty) {
-      _addTutorMessage(
-        isChild
-            ? 'Welcome to the Reading Lounge! We can talk about books, make up silly stories, or practice reading together. What sounds fun?'
-            : 'Welcome to the Reading Lounge. We can discuss books, explore new vocabulary, or practice reading at your pace. What would you like to talk about?',
-      );
-    }
-  }
-
-  Future<void> _initializeChatSpeech() async {
-    try {
-      speechAvailable = await chatSpeech.initialize(
-        onStatus: (value) {
+      chatSpeechAvailable = await chatSpeech.initialize(
+        onStatus: (status) {
           if (!mounted) return;
 
-          if (value == 'notListening' && isListening) {
+          if (status == 'notListening' && isListening) {
             setState(() => isListening = false);
 
             if (heardWords.trim().isNotEmpty) {
@@ -1309,103 +1339,71 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
 
           setState(() {
             isListening = false;
-            speechProblem =
-                'I had trouble hearing you. Please try the microphone again.';
+            statusMessage = 'Microphone issue: ${error.errorMsg}';
           });
-
-          if (heardWords.trim().isNotEmpty) {
-            _processSpokenMessage();
-          }
         },
-        debugLogging: false,
       );
-
-      if (mounted && !speechAvailable) {
-        setState(() {
-          speechProblem =
-              'Voice recognition is unavailable. You can try again or use the backup option.';
-        });
-      }
     } catch (_) {
-      speechAvailable = false;
-
-      if (mounted) {
-        setState(() {
-          speechProblem = 'I could not start the microphone.';
-        });
-      }
+      chatSpeechAvailable = false;
     }
+
+    if (mounted) {
+      setState(() {
+        if (!chatSpeechAvailable) {
+          statusMessage =
+              'Speech recognition is unavailable on this device.';
+        }
+      });
+    }
+
+    await _speak(
+      isChild
+          ? 'Hey there! Welcome to the Reading Lounge. Let’s chat!'
+          : 'Welcome to the Reading Lounge. What would you like to discuss?',
+    );
   }
 
-  Future<void> _speak(String text) async {
+  Future<void> _speak(String message) async {
     try {
       await chatTts.stop();
-      await chatTts.speak(text);
+      if (!mounted) return;
+
+      setState(() => isSpeaking = true);
+      await chatTts.speak(message);
     } catch (_) {
-      // Text remains visible if the device cannot speak.
+      // Written replies remain visible if speech output is unavailable.
+    } finally {
+      if (mounted) setState(() => isSpeaking = false);
     }
-  }
-
-  void _addTutorMessage(String text) {
-    setState(() {
-      messages.add({
-        'speaker': 'tutor',
-        'text': text,
-      });
-    });
-
-    _speak(text);
-  }
-
-  void _addLearnerMessage(String text) {
-    setState(() {
-      messages.add({
-        'speaker': 'learner',
-        'text': text,
-      });
-    });
   }
 
   Future<void> _toggleChatMicrophone() async {
     if (isListening) {
       await chatSpeech.stop();
-
       if (!mounted) return;
 
       setState(() => isListening = false);
 
       if (heardWords.trim().isNotEmpty) {
         _processSpokenMessage();
-      } else {
-        setState(() {
-          speechProblem = 'I didn’t catch that. Want to try again?';
-        });
       }
-
       return;
     }
 
-    if (!speechAvailable) {
-      await _initializeChatSpeech();
-    }
-
-    if (!speechAvailable) {
-      if (!mounted) return;
-
+    if (!chatSpeechAvailable) {
       setState(() {
-        speechProblem =
-            'Voice recognition is unavailable. You can use the backup option.';
-        showBackupTyping = true;
+        statusMessage =
+            'Speech recognition is unavailable. Check microphone permission.';
       });
-
       return;
     }
+
+    chatSessionHandled = false;
+    heardWords = '';
 
     setState(() {
-      heardWords = '';
-      speechProblem = '';
       isListening = true;
-      showBackupTyping = false;
+      statusMessage = 'Listening...';
     });
 
     try {
@@ -1413,8 +1411,12 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
         onResult: (result) {
           if (!mounted) return;
 
+          heardWords = result.recognizedWords;
+
           setState(() {
-            heardWords = result.recognizedWords;
+            statusMessage = heardWords.isEmpty
+                ? 'Listening...'
+                : 'I heard: "$heardWords"';
           });
 
           if (result.finalResult) {
@@ -1433,101 +1435,89 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
 
       setState(() {
         isListening = false;
-        speechProblem = 'The microphone stopped. Please try again.';
-        showBackupTyping = true;
+        statusMessage =
+            'I could not start the microphone. Try again.';
       });
     }
   }
 
   void _processSpokenMessage() {
-    final text = heardWords.trim();
+    if (chatSessionHandled) return;
 
-    if (text.isEmpty) return;
+    chatSessionHandled = true;
 
-    heardWords = '';
-    _respondToLearner(text);
+    final message = heardWords.trim();
+    if (message.isEmpty) return;
+
+    _sendMessage(message);
   }
 
-  void _submitBackupMessage() {
-    final text = backupController.text.trim();
+  void _sendTypedMessage() {
+    final message = messageController.text.trim();
+    if (message.isEmpty) return;
 
-    if (text.isEmpty) return;
+    messageController.clear();
+    _sendMessage(message);
+  }
 
-    backupController.clear();
+  void _sendMessage(String message) {
+    final reply = _makeReply(message);
 
     setState(() {
-      showBackupTyping = false;
-      speechProblem = '';
+      messages.add({
+        'speaker': 'You',
+        'message': message,
+      });
+
+      messages.add({
+        'speaker': 'Tutor',
+        'message': reply,
+      });
+
+      statusMessage =
+          'You can tap the microphone to say something else.';
     });
 
-    _respondToLearner(text);
+    _speak(reply);
   }
 
-  void _respondToLearner(String text) {
-    _addLearnerMessage(text);
+  String _makeReply(String message) {
+    final text = message.toLowerCase();
 
-    final reply = _makeTutorReply(text);
-
-    Future.delayed(const Duration(milliseconds: 350), () {
-      if (!mounted) return;
-      _addTutorMessage(reply);
-    });
-  }
-
-  String _makeTutorReply(String text) {
-    final lower = text.toLowerCase();
-
-    if (lower.contains('help') ||
-        lower.contains('hard') ||
-        lower.contains('stuck')) {
+    if (text.contains('help') || text.contains('hard')) {
       return isChild
-          ? 'I’ve got you! Let’s slow it down. Pick one word, and we’ll look at its sounds one at a time. No rush, sound detective!'
-          : 'Let’s take it one step at a time. We can break a difficult word into smaller sound parts and work through it together.';
+          ? 'That’s okay! We can slow down and take it one little step at a time. Which word are you working on?'
+          : 'That is understandable. We can slow down, break the word into smaller parts, and work through it together.';
     }
 
-    if (lower.contains('book') || lower.contains('read')) {
+    if (text.contains('book') || text.contains('story')) {
       return isChild
-          ? 'Books are full of adventures! What kind of story should we explore: animals, space, mysteries, or something really silly?'
-          : 'Reading opens up all kinds of worlds. What genres or subjects do you enjoy? We can explore vocabulary and ideas together.';
+          ? 'Stories are full of adventures! We can talk about characters, places, and what might happen next. What kind of story do you like?'
+          : 'Stories are a great way to build reading confidence. What genres or topics do you enjoy?';
     }
 
-    if (lower.contains('thank')) {
+    if (text.contains('hello') || text.contains('hi')) {
       return isChild
-          ? 'You’re welcome! I’m glad we’re learning together. Ready for another little reading adventure?'
-          : 'You’re welcome. Keep giving yourself credit for the work you’re putting in. Would you like to keep practicing?';
+          ? 'Hello, reading superstar! What shall we explore today?'
+          : 'Hello! It is good to have you here. What would you like to practice?';
     }
 
-    if (lower.contains('tired') || lower.contains('boring')) {
+    if (text.contains('thank')) {
       return isChild
-          ? 'Then let’s shake things up! We can make a silly story, invent a funny character, or take a little break.'
-          : 'A change of pace can help. We can switch to a short story, vocabulary game, or a break from structured practice.';
-    }
-
-    if (lower.contains('hello') ||
-        lower.contains('hi ') ||
-        lower == 'hi' ||
-        lower == 'hey') {
-      return isChild
-          ? 'Hey there, superstar! What should we do today: a silly story, a word challenge, or a book adventure?'
-          : 'Hello! What would you like to work on today? We can practice reading or just have a conversation.';
-    }
-
-    if (lower.contains('story')) {
-      return isChild
-          ? 'Story time! Once there was a tiny dragon who sneezed bubbles instead of fire. Every time he sneezed, the bubbles made a different sound. What do you think happened next?'
-          : 'Let’s build a story together. Imagine a character who discovers something unexpected. What do they find?';
+          ? 'You are very welcome! Every bit of practice counts.'
+          : 'You are welcome. Keep going at a pace that works for you.';
     }
 
     return isChild
-        ? 'That’s interesting! Tell me a little more. I’m listening, and we can turn your idea into a story or a reading adventure!'
-        : 'I’m listening. Tell me a little more about that, and we can explore the idea together.';
+        ? 'That sounds interesting! Tell me a little more. I am listening!'
+        : 'Thanks for sharing that. Tell me a little more, and we can explore it together.';
   }
 
   @override
   void dispose() {
     chatSpeech.stop();
     chatTts.stop();
-    backupController.dispose();
+    messageController.dispose();
     super.dispose();
   }
 
@@ -1536,7 +1526,6 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reading Lounge'),
-        backgroundColor: cream,
       ),
       body: SafeArea(
         child: Column(
@@ -1546,61 +1535,44 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                 padding: const EdgeInsets.all(16),
                 itemCount: messages.length,
                 itemBuilder: (context, index) {
-                  final message = messages[index];
-                  final isTutor = message['speaker'] == 'tutor';
+                  final item = messages[index];
+                  final isUser = item['speaker'] == 'You';
 
                   return Align(
-                    alignment: isTutor
-                        ? Alignment.centerLeft
-                        : Alignment.centerRight,
+                    alignment: isUser
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
                     child: Container(
-                      constraints: const BoxConstraints(maxWidth: 310),
+                      constraints: const BoxConstraints(
+                        maxWidth: 310,
+                      ),
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: isTutor
-                            ? Colors.white
-                            : const Color(0xFFE9EFFB),
+                        color: isUser
+                            ? const Color(0xFFE6E1FF)
+                            : Colors.white,
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: const Color(0xFFE5E8EF),
-                        ),
                       ),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isTutor ? 'Reading buddy' : 'You',
+                            item['speaker'] ?? '',
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: blue,
                               fontSize: 12,
                             ),
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            message['text'] ?? '',
+                            item['message'] ?? '',
                             style: const TextStyle(
                               fontSize: 16,
                               height: 1.4,
-                              color: ink,
                             ),
                           ),
-                          if (isTutor)
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: IconButton(
-                                tooltip: 'Hear this message',
-                                visualDensity: VisualDensity.compact,
-                                onPressed: () =>
-                                    _speak(message['text'] ?? ''),
-                                icon: const Icon(
-                                  Icons.volume_up_rounded,
-                                  color: blue,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
                         ],
                       ),
                     ),
@@ -1608,69 +1580,69 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
                 },
               ),
             ),
-            if (speechProblem.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  speechProblem,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: coral),
-                ),
-              ),
-            if (isListening)
-              const Padding(
-                padding: EdgeInsets.all(8),
-                child: Text(
-                  'Listening... Tap the microphone when you are finished.',
-                  style: TextStyle(color: blue),
-                ),
-              ),
-            if (showBackupTyping)
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: backupController,
-                        decoration: const InputDecoration(
-                          hintText: 'Backup message',
-                          border: OutlineInputBorder(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+              child: Column(
+                children: [
+                  Text(
+                    statusMessage,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: messageController,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => _sendTypedMessage(),
+                          decoration: const InputDecoration(
+                            hintText: 'Write a message...',
+                            border: OutlineInputBorder(),
+                          ),
                         ),
-                        onSubmitted: (_) => _submitBackupMessage(),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filled(
+                        onPressed: _sendTypedMessage,
+                        icon: const Icon(Icons.send_rounded),
+                        tooltip: 'Send message',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: chatSpeechAvailable
+                          ? _toggleChatMicrophone
+                          : null,
+                      icon: Icon(
+                        isListening
+                            ? Icons.stop_circle
+                            : Icons.mic_rounded,
+                      ),
+                      label: Text(
+                        isListening
+                            ? 'Stop listening'
+                            : 'Talk to your tutor',
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    IconButton.filled(
-                      onPressed: _submitBackupMessage,
-                      icon: const Icon(Icons.send),
+                  ),
+                  if (isSpeaking)
+                    TextButton.icon(
+                      onPressed: () async {
+                        await chatTts.stop();
+
+                        if (mounted) {
+                          setState(() => isSpeaking = false);
+                        }
+                      },
+                      icon: const Icon(Icons.stop_rounded),
+                      label: const Text('Stop tutor voice'),
                     ),
-                  ],
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(58),
-                    backgroundColor: isListening ? coral : blue,
-                  ),
-                  onPressed: _toggleChatMicrophone,
-                  icon: Icon(
-                    isListening ? Icons.stop_circle : Icons.mic,
-                  ),
-                  label: Text(
-                    isListening
-                        ? 'Tap to stop and send'
-                        : 'Talk to your reading buddy',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+                ],
               ),
             ),
           ],
@@ -1680,50 +1652,27 @@ class _TutorChatScreenState extends State<TutorChatScreen> {
   }
 }
 
-class SectionTitle extends StatelessWidget {
-  final String text;
-
-  const SectionTitle(this.text, {super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        color: ink,
-        fontSize: 17,
-        fontWeight: FontWeight.w800,
-      ),
-    );
-  }
-}
-
 class _StatLine extends StatelessWidget {
-  final IconData icon;
   final String label;
-  final Color color;
+  final int value;
 
   const _StatLine({
-    required this.icon,
     required this.label,
-    required this.color,
+    required this.value,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(icon, color: color, size: 21),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: ink,
-                fontWeight: FontWeight.w600,
-              ),
+          Text(label),
+          Text(
+            '$value',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
