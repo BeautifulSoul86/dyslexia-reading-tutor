@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -212,6 +213,7 @@ class _LessonScreenState extends State<LessonScreen> {
   bool _lessonVoiceReady = false;
   bool _isListening = false;
   bool _lessonSessionHandled = true;
+  bool _lessonEvaluationScheduled = false;
   bool _showEmergencyTyping = false;
   String _recognizedWords = '';
   String _speechProblem = '';
@@ -235,14 +237,11 @@ class _LessonScreenState extends State<LessonScreen> {
       final available = await _lessonSpeech.initialize(
         onStatus: (status) {
           if (!mounted) return;
-          if ((status == 'notListening' || status == 'done') && _isListening) {
-            setState(() => _isListening = false);
-            // Android may end listening automatically after a pause or timeout.
-            // Treat that as the end of this answer, not as a new empty session.
-            if (!_lessonSessionHandled) {
-              _lessonSessionHandled = true;
-              _evaluateSpokenAttempt();
-            }
+          if (status == 'notListening' || status == 'done') {
+            if (_isListening) setState(() => _isListening = false);
+            // The plugin can deliver its final recognition result just after
+            // this status callback. Wait briefly before evaluating the answer.
+            _scheduleLessonEvaluation();
           }
         },
         onError: (error) {
@@ -253,11 +252,9 @@ class _LessonScreenState extends State<LessonScreen> {
             _speechProblem = hasWords ? '' : error.errorMsg;
             _showEmergencyTyping = !hasWords;
           });
-          // Keep and evaluate words already captured before an Android error.
-          if (hasWords && !_lessonSessionHandled) {
-            _lessonSessionHandled = true;
-            _evaluateSpokenAttempt();
-          }
+          // Android may report an error after delivering useful partial words.
+          // Give any final result callback time to arrive before evaluating.
+          if (!_lessonSessionHandled) _scheduleLessonEvaluation();
         },
       );
       if (!mounted) return;
@@ -294,13 +291,12 @@ class _LessonScreenState extends State<LessonScreen> {
 
   Future<void> _toggleLessonMicrophone() async {
     if (_isListening) {
-      // Mark the session handled before stop(), because Android may send its
-      // notListening callback while stop() is still completing.
-      _lessonSessionHandled = true;
+      // Do not evaluate immediately: stop() can trigger the final result
+      // callback asynchronously. The scheduler waits for it to arrive.
       await _lessonSpeech.stop();
       if (!mounted) return;
       setState(() => _isListening = false);
-      _evaluateSpokenAttempt();
+      _scheduleLessonEvaluation();
       return;
     }
     if (!_speechAvailable) {
@@ -316,13 +312,14 @@ class _LessonScreenState extends State<LessonScreen> {
       _speechProblem = '';
       _showEmergencyTyping = false;
       _lessonSessionHandled = false;
+      _lessonEvaluationScheduled = false;
       _isListening = true;
     });
     try {
       await _lessonSpeech.listen(
         onResult: _onLessonSpeechResult,
-        listenFor: const Duration(seconds: 60),
-        pauseFor: const Duration(seconds: 10),
+        listenFor: const Duration(seconds: 90),
+        pauseFor: const Duration(seconds: 15),
         partialResults: true,
         cancelOnError: false,
         localeId: 'en_US',
@@ -340,6 +337,18 @@ class _LessonScreenState extends State<LessonScreen> {
   void _onLessonSpeechResult(stt_result.SpeechRecognitionResult result) {
     if (!mounted) return;
     setState(() => _recognizedWords = result.recognizedWords);
+    if (result.finalResult && !_isListening) _scheduleLessonEvaluation();
+  }
+
+  void _scheduleLessonEvaluation() {
+    if (_lessonSessionHandled || _lessonEvaluationScheduled) return;
+    _lessonEvaluationScheduled = true;
+    Future<void>.delayed(const Duration(milliseconds: 900), () {
+      if (!mounted || _lessonSessionHandled) return;
+      _lessonSessionHandled = true;
+      _lessonEvaluationScheduled = false;
+      _evaluateSpokenAttempt();
+    });
   }
 
   void _evaluateSpokenAttempt() {
@@ -413,9 +422,9 @@ class _LessonScreenState extends State<LessonScreen> {
       _showEmergencyTyping = false;
       tutorMessage = first
           ? (widget.learnerType == 'Child'
-              ? 'Hey, superstar! 🌟 Let’s wake up those reading muscles. What sound does the first letter make?'
-              : 'Welcome. Let’s work through a word carefully. What sound does the first letter make?')
-          : 'Here is a fresh word. Take your time and look carefully at every letter. What sound do you hear at the beginning?';
+              ? 'Hey, superstar! 🌟 Let’s wake up those reading muscles. Read this word aloud when you’re ready!'
+              : 'Welcome. Let’s work through a word carefully. Please read the word aloud when you are ready.')
+          : 'Here is a fresh word. Take your time, look carefully at every letter, and read the whole word aloud when you are ready.';
     });
     _speakLessonMessage(tutorMessage);
   }
