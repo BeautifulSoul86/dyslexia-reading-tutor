@@ -211,6 +211,7 @@ class _LessonScreenState extends State<LessonScreen> {
   bool _speechAvailable = false;
   bool _lessonVoiceReady = false;
   bool _isListening = false;
+  bool _lessonSessionHandled = true;
   bool _showEmergencyTyping = false;
   String _recognizedWords = '';
   String _speechProblem = '';
@@ -234,17 +235,29 @@ class _LessonScreenState extends State<LessonScreen> {
       final available = await _lessonSpeech.initialize(
         onStatus: (status) {
           if (!mounted) return;
-          if (status == 'notListening' || status == 'done') {
+          if ((status == 'notListening' || status == 'done') && _isListening) {
             setState(() => _isListening = false);
+            // Android may end listening automatically after a pause or timeout.
+            // Treat that as the end of this answer, not as a new empty session.
+            if (!_lessonSessionHandled) {
+              _lessonSessionHandled = true;
+              _evaluateSpokenAttempt();
+            }
           }
         },
         onError: (error) {
           if (!mounted) return;
+          final hasWords = _recognizedWords.trim().isNotEmpty;
           setState(() {
             _isListening = false;
-            _speechProblem = error.errorMsg;
-            _showEmergencyTyping = true;
+            _speechProblem = hasWords ? '' : error.errorMsg;
+            _showEmergencyTyping = !hasWords;
           });
+          // Keep and evaluate words already captured before an Android error.
+          if (hasWords && !_lessonSessionHandled) {
+            _lessonSessionHandled = true;
+            _evaluateSpokenAttempt();
+          }
         },
       );
       if (!mounted) return;
@@ -281,6 +294,9 @@ class _LessonScreenState extends State<LessonScreen> {
 
   Future<void> _toggleLessonMicrophone() async {
     if (_isListening) {
+      // Mark the session handled before stop(), because Android may send its
+      // notListening callback while stop() is still completing.
+      _lessonSessionHandled = true;
       await _lessonSpeech.stop();
       if (!mounted) return;
       setState(() => _isListening = false);
@@ -299,13 +315,14 @@ class _LessonScreenState extends State<LessonScreen> {
       _recognizedWords = '';
       _speechProblem = '';
       _showEmergencyTyping = false;
+      _lessonSessionHandled = false;
       _isListening = true;
     });
     try {
       await _lessonSpeech.listen(
         onResult: _onLessonSpeechResult,
-        listenFor: const Duration(seconds: 45),
-        pauseFor: const Duration(seconds: 5),
+        listenFor: const Duration(seconds: 60),
+        pauseFor: const Duration(seconds: 10),
         partialResults: true,
         cancelOnError: false,
         localeId: 'en_US',
