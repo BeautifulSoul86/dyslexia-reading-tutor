@@ -214,6 +214,7 @@ class _LessonScreenState extends State<LessonScreen> {
   bool _isListening = false;
   bool _lessonSessionHandled = true;
   bool _lessonEvaluationScheduled = false;
+  Timer? _lessonEvaluationTimer;
   bool _showEmergencyTyping = false;
   String _recognizedWords = '';
   String _speechProblem = '';
@@ -236,22 +237,35 @@ class _LessonScreenState extends State<LessonScreen> {
       _lessonVoiceReady = true;
       final available = await _lessonSpeech.initialize(
         onStatus: (status) {
-          if (!mounted) return;
-          if (status == 'notListening' || status == 'done') {
-            if (_isListening) setState(() => _isListening = false);
-            // The plugin can deliver its final recognition result just after
-            // this status callback. Wait briefly before evaluating the answer.
-            _scheduleLessonEvaluation();
+  if (!mounted) return;
+
+  if (status == 'notListening' || status == 'done') {
+    setState(() => _isListening = false);
+
+    if (!_lessonSessionHandled) {
+      _scheduleLessonEvaluation();
+    }
+  }
+},
           }
         },
         onError: (error) {
-          if (!mounted) return;
-          final hasWords = _recognizedWords.trim().isNotEmpty;
-          setState(() {
-            _isListening = false;
-            _speechProblem = hasWords ? '' : error.errorMsg;
-            _showEmergencyTyping = !hasWords;
-          });
+  if (!mounted) return;
+
+  final hasWords = _recognizedWords.trim().isNotEmpty;
+
+  setState(() {
+    _isListening = false;
+    _speechProblem = hasWords
+        ? ''
+        : 'The microphone stopped before I could hear enough. Please try again.';
+    _showEmergencyTyping = false;
+  });
+
+  if (!_lessonSessionHandled && hasWords) {
+    _scheduleLessonEvaluation();
+  }
+},
           // Android may report an error after delivering useful partial words.
           // Give any final result callback time to arrive before evaluating.
           if (!_lessonSessionHandled) _scheduleLessonEvaluation();
